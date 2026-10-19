@@ -1,0 +1,46 @@
+.qa-topic {
+  margin-bottom: 2.5rem;
+}
+
+.qa-topic h2 {
+  margin: 0 0 0.75rem;
+  font-size: 1.35rem;
+  color: var(--sepia-300);
+  letter-spacing: 0.04em;
+}
+
+.qa-item {
+  border-top: 1px solid rgb(168 139 106 / 0.3);
+}
+
+.qa-item:last-child {
+  border-bottom: 1px solid rgb(168 139 106 / 0.3);
+}
+
+.qa-item summary {
+  display: flex;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: 0.9rem 0.25rem;
+  cursor: pointer;
+  list-style: none;
+}
+
+.qa-item summary::-webkit-details-marker {
+  display: none;
+}
+
+.qa-item summary::after {
+  content: "+";
+  color: var(--sepia-300);
+}
+
+.qa-item[open] summary::after {
+  content: "−";
+}
+
+.qa-item p {
+  margin: 0 0.25rem 1rem;
+  font-family: Georgia, "Times New Roman", serif;
+  color: var(--cream-50);
+}

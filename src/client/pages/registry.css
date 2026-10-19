@@ -1,0 +1,106 @@
+.registry .notice {
+  margin-bottom: 1.5rem;
+}
+
+.gift-list {
+  display: grid;
+  gap: 1.5rem;
+}
+
+.gift {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 1.25rem;
+}
+
+.gift:has(.gift-image) {
+  grid-template-columns: minmax(8rem, 12rem) minmax(0, 1fr);
+}
+
+.gift-image {
+  width: 100%;
+  aspect-ratio: 1;
+  object-fit: cover;
+  border-radius: var(--radius);
+  border: 1px solid rgb(168 139 106 / 0.3);
+}
+
+.gift h2 {
+  margin: 0 0 0.25rem;
+  font-size: clamp(1.25rem, 3.5vw, 1.5rem);
+}
+
+.gift-description {
+  margin: 0 0 0.5rem;
+  font-family: Georgia, "Times New Roman", serif;
+  color: var(--cream-50);
+}
+
+.gift-link {
+  display: inline-block;
+  margin-bottom: 1rem;
+  color: var(--sepia-300);
+}
+
+.gift-progress {
+  margin: 0.5rem 0 1rem;
+}
+
+.gift-bar {
+  height: 0.65rem;
+  border: 1px solid rgb(168 139 106 / 0.5);
+  border-radius: 999px;
+  background: rgb(31 22 16 / 0.6);
+  overflow: hidden;
+}
+
+.gift-bar-fill {
+  height: 100%;
+  border-radius: inherit;
+  background: linear-gradient(90deg, var(--sepia-400), var(--cream-100));
+  transition: width 600ms ease-out;
+}
+
+.gift-amounts {
+  display: flex;
+  justify-content: space-between;
+  gap: 1rem;
+  margin: 0.4rem 0 0;
+  font-size: 0.95rem;
+  color: var(--sepia-300);
+}
+
+.gift-funded {
+  margin: 0;
+  text-align: center;
+  font-size: 1.1rem;
+}
+
+.gift .actions {
+  justify-content: flex-start;
+  margin-top: 0;
+}
+
+.gift-form {
+  margin-top: 0.5rem;
+}
+
+.gift-form .actions {
+  margin-top: 0.5rem;
+}
+
+.gift-secure {
+  margin: 0.75rem 0 0;
+  font-size: 0.85rem;
+  color: var(--sepia-400);
+}
+
+@media (max-width: 34rem) {
+  .gift:has(.gift-image) {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .gift-image {
+    aspect-ratio: 16 / 10;
+  }
+}

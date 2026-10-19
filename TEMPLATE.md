@@ -1,7 +1,7 @@
 # Wedding Website Details Template
 
 Fill in every `{{ ... }}` placeholder below to personalize the site for a couple.
-Each value maps to text shown on the Squarespace wedding site (Home, Our Story,
+Each value maps to text shown on the wedding site (Home, Our Story,
 Registry, Travel & Stay, and RSVP pages).
 
 ## Couple
@@ -61,3 +61,31 @@ Hotel phone: {{ HOTEL_PHONE }}
 
 RSVP intro: {{ RSVP_INTRO }}   <!-- e.g. "We look forward to seeing you! Fill out the form on this page." -->
 RSVP button label: {{ RSVP_BUTTON_LABEL }}   <!-- e.g. "I'LL BE THERE!" -->
+
+## Wedding — scheduling
+
+Wedding time zone: {{ WEDDING_TIME_ZONE }}   <!-- IANA name, e.g. "America/Chicago" -->
+Couple contact: {{ COUPLE_CONTACT }}   <!-- shown when a guest can't find their invitation -->
+
+## RSVP — waves
+
+RSVP deadline, wave 1: {{ WAVE_1_DEADLINE }}   <!-- e.g. "March 1, 2027" -->
+RSVP deadline, wave 2: {{ WAVE_2_DEADLINE }}
+RSVP deadline, wave 3: {{ WAVE_3_DEADLINE }}
+
+## Q&A
+
+<!-- Each answer appears on the Q&A page only once it is filled in. -->
+Nearest airports: {{ NEAREST_AIRPORTS }}
+Parking: {{ PARKING }}
+Ceremony to reception transport: {{ CEREMONY_TO_RECEPTION }}
+Lodging recommendations: {{ LODGING }}
+Hotel room block: {{ HOTEL_ROOM_BLOCK }}
+Guest arrival time: {{ GUEST_ARRIVAL_TIME }}
+Dress code: {{ DRESS_CODE }}
+Children policy: {{ CHILDREN_POLICY }}
+Plus-one policy: {{ PLUS_ONE_POLICY }}
+Indoor or outdoor: {{ INDOOR_OR_OUTDOOR }}
+Accessibility: {{ ACCESSIBILITY }}
+Photo policy: {{ PHOTO_POLICY }}
+Things to do nearby: {{ THINGS_TO_DO }}

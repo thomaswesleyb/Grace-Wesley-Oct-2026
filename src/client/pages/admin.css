@@ -1,0 +1,70 @@
+.page.admin {
+  max-width: 72rem;
+}
+
+.admin-tiles {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(8rem, 1fr));
+  gap: 0.75rem;
+}
+
+.admin-tile {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 1rem;
+  border: 1px solid rgb(168 139 106 / 0.35);
+  border-radius: var(--radius);
+}
+
+.admin-tile-value {
+  font-size: 2rem;
+  font-weight: 700;
+  line-height: 1.1;
+}
+
+.admin-tile-label,
+.admin-muted {
+  color: var(--sepia-300);
+}
+
+.admin-table-wrap {
+  margin-top: 1.5rem;
+  overflow-x: auto;
+}
+
+.admin-table {
+  width: 100%;
+  min-width: 48rem;
+  border-collapse: collapse;
+  font-family: Georgia, "Times New Roman", serif;
+  font-size: 0.95rem;
+}
+
+.admin-table th,
+.admin-table td {
+  padding: 0.6rem 0.75rem;
+  text-align: left;
+  vertical-align: top;
+  border-bottom: 1px solid rgb(168 139 106 / 0.2);
+}
+
+.admin-table th {
+  font-family: var(--serif);
+  color: var(--sepia-300);
+  white-space: nowrap;
+}
+
+.admin-table tr[data-status="held"] {
+  opacity: 0.6;
+}
+
+.admin-gifts {
+  margin-top: 2.5rem;
+}
+
+.admin-gifts h2 {
+  margin: 0 0 0.75rem;
+  font-size: 1.35rem;
+  color: var(--sepia-300);
+}

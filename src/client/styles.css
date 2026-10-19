@@ -1,0 +1,288 @@
+@import "@fontsource/playfair-display-sc/400.css";
+@import "@fontsource/playfair-display-sc/700.css";
+@import "@fontsource/unifrakturmaguntia/400.css";
+
+:root {
+  color-scheme: dark;
+  --espresso-900: #1f1610;
+  --espresso-800: #2b1f17;
+  --espresso-700: #3b2a1e;
+  --espresso-600: #4d3828;
+  --sepia-400: #a88b6a;
+  --sepia-300: #c4a985;
+  --cream-100: #efe6d6;
+  --cream-50: #f7f1e6;
+  --ink-error: #f0b4a0;
+  --ink-ok: #c9d9a8;
+
+  --serif: "Playfair Display SC", "Playfair Display", Georgia, "Times New Roman", serif;
+  --blackletter: "UnifrakturMaguntia", "Old English Text MT", "Goudy Text", serif;
+
+  --gutter: clamp(1rem, 4vw, 2rem);
+  --radius: 2px;
+}
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+html {
+  background: var(--espresso-900);
+}
+
+body {
+  margin: 0;
+  min-height: 100dvh;
+  color: var(--cream-100);
+  font-family: var(--serif);
+  font-size: 1.0625rem;
+  line-height: 1.6;
+  background-color: var(--espresso-800);
+  background-image:
+    radial-gradient(ellipse at 50% 20%, rgb(77 56 40 / 0.55), transparent 70%),
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='240' height='240'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='3' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 0.94 0 0 0 0 0.88 0 0 0 0 0.78 0 0 0 0.07 0'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+  -webkit-font-smoothing: antialiased;
+}
+
+a {
+  color: var(--cream-50);
+  text-decoration-color: var(--sepia-400);
+  text-underline-offset: 0.2em;
+}
+
+a:hover {
+  text-decoration-color: var(--cream-50);
+}
+
+:focus-visible {
+  outline: 2px solid var(--sepia-300);
+  outline-offset: 3px;
+}
+
+.page {
+  padding-inline: var(--gutter);
+  padding-block: 2rem 4rem;
+  max-width: 46rem;
+  margin-inline: auto;
+}
+
+.page h1 {
+  font-size: clamp(1.75rem, 5vw, 2.5rem);
+  font-weight: 700;
+  text-align: center;
+  margin: 0 0 0.25rem;
+  letter-spacing: 0.02em;
+}
+
+.page .lede {
+  text-align: center;
+  color: var(--sepia-300);
+  margin: 0 0 2.5rem;
+}
+
+.rule {
+  display: block;
+  width: min(16rem, 60%);
+  height: 1px;
+  margin: 1.5rem auto;
+  border: 0;
+  background: linear-gradient(90deg, transparent, var(--sepia-400), transparent);
+}
+
+/*
+ * Page backdrops (see components/Backdrop.tsx): a fixed photo behind the page, blurred, dimmed
+ * and pulled toward sepia so every page photo reads as atmosphere in the same palette. The
+ * gradient darkens toward the bottom so text further down stays readable.
+ */
+.backdrop {
+  position: fixed;
+  inset: -2rem;
+  z-index: 0;
+  background:
+    linear-gradient(rgb(31 22 16 / 0.35), rgb(31 22 16 / 0.55) 60%, rgb(31 22 16 / 0.85)),
+    var(--backdrop-image) var(--backdrop-position, center) / cover no-repeat;
+  filter: blur(3px) saturate(0.65) sepia(0.35) brightness(0.55);
+}
+
+.backdrop ~ * {
+  position: relative;
+  z-index: 1;
+}
+
+/* Navigation */
+.nav {
+  position: sticky;
+  top: env(safe-area-inset-top, 0px);
+  z-index: 10;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem 1.5rem;
+  padding: 0.75rem var(--gutter);
+  background: rgb(31 22 16 / 0.85);
+  backdrop-filter: blur(6px);
+  border-bottom: 1px solid rgb(168 139 106 / 0.25);
+}
+
+.nav-monogram {
+  font-family: var(--blackletter);
+  font-size: 1.5rem;
+  line-height: 1;
+  text-decoration: none;
+}
+
+.nav-links {
+  display: flex;
+  gap: 1.25rem;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.nav-links a {
+  text-decoration: none;
+  letter-spacing: 0.06em;
+  padding-block: 0.25rem;
+  border-bottom: 1px solid transparent;
+}
+
+.nav-links a[aria-current="page"] {
+  border-bottom-color: var(--sepia-300);
+}
+
+/* Buttons and forms */
+.button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  min-height: 2.75rem;
+  padding: 0.5rem 1.5rem;
+  font: inherit;
+  letter-spacing: 0.06em;
+  color: var(--espresso-900);
+  background: var(--cream-100);
+  border: 1px solid var(--cream-100);
+  border-radius: var(--radius);
+  cursor: pointer;
+  text-decoration: none;
+  transition:
+    background 150ms ease,
+    color 150ms ease;
+}
+
+.button:hover {
+  background: var(--cream-50);
+}
+
+.button.secondary {
+  color: var(--cream-100);
+  background: transparent;
+  border-color: var(--sepia-400);
+}
+
+.button.secondary:hover {
+  background: rgb(239 230 214 / 0.08);
+}
+
+.button:disabled {
+  opacity: 0.55;
+  cursor: progress;
+}
+
+.field {
+  display: grid;
+  gap: 0.35rem;
+  margin-bottom: 1.25rem;
+}
+
+.field label,
+.field legend {
+  font-size: 0.95rem;
+  letter-spacing: 0.04em;
+  color: var(--sepia-300);
+}
+
+.field input,
+.field textarea {
+  width: 100%;
+  min-height: 2.75rem;
+  padding: 0.6rem 0.75rem;
+  font: inherit;
+  font-family: Georgia, "Times New Roman", serif;
+  color: var(--cream-50);
+  background: rgb(31 22 16 / 0.6);
+  border: 1px solid var(--espresso-600);
+  border-radius: var(--radius);
+}
+
+.field textarea {
+  min-height: 5rem;
+  resize: vertical;
+}
+
+.field input:focus,
+.field textarea:focus {
+  border-color: var(--sepia-300);
+  outline: none;
+}
+
+.row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0 1rem;
+}
+
+.row > .field {
+  flex: 1 1 12rem;
+}
+
+.actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+  justify-content: center;
+  margin-top: 1.5rem;
+}
+
+.notice {
+  padding: 1rem 1.25rem;
+  border: 1px solid var(--espresso-600);
+  border-radius: var(--radius);
+  background: rgb(31 22 16 / 0.45);
+  text-align: center;
+}
+
+.notice.error {
+  border-color: rgb(240 180 160 / 0.5);
+  color: var(--ink-error);
+}
+
+.panel {
+  padding: clamp(1.25rem, 4vw, 2rem);
+  border: 1px solid rgb(168 139 106 / 0.35);
+  border-radius: var(--radius);
+  background: rgb(31 22 16 / 0.35);
+}
+
+.visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-delay: 0ms !important;
+    transition-duration: 0.01ms !important;
+  }
+}

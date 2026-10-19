@@ -1,0 +1,8 @@
+minimumReleaseAge: 1440
+ignoreScripts: true
+engineStrict: true
+# Install scripts stay blocked. These packages ship prebuilt platform binaries via
+# optionalDependencies and work without their postinstall step.
+allowBuilds:
+  esbuild: false
+  workerd: false
