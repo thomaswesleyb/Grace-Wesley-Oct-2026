@@ -7,9 +7,12 @@ The wedding website should include the following discrete page components:
 2) A Q&A page, which includes important expected questions such as how to get to certain locations. If the details are not provided in DETAILS.md, the question is hidden until the answer is added.
 3) A wedding registry page. This is the most technically involved page. It will include every item in wedding-registry.csv, and a visual horizontal bar with a progress marker that fills up as money is donated. This includes a donate button, and should be wired in with a payment platform using an API.
 4) An RSVP page. Guests find their invitation by name and respond for everyone on it.
+5) A Photos page: the engagement photos and other pictures the couple picks.
+6) A Labyrinth page: a small maze game modeled on the brick labyrinth in Abbo's Alley, Sewanee.
 
 ## Pages and navigation
-Home (invitation), Q&A, RSVP, Registry. Registry stays out of the navigation until payments ship.
+Home (invitation), Info (Q&A), RSVP, Photos, Labyrinth, Registry. Registry stays out of the
+navigation until payments ship. The nav links wrap onto a second line on narrow phones.
 There is no separate Our Story or Travel & Stay page; travel and lodging live in Q&A.
 
 ## Visual style
@@ -61,6 +64,35 @@ accessibility); registry and other. Each entry appears only when its answer is i
   person, a plus-one where allowed, and an email, song request and note per invitation.
 - Each wave has its own respond-by date. Guests can edit until then through a link emailed to
   them. Changing a decline to an accept only works while seats are open.
+
+## Photos
+- The couple puts originals in `images/` (JPEG, PNG, WebP or HEIC; never modified) with
+  `images/captions.csv` (`file,caption,alt`). The CSV sets the order. Every photo needs
+  a row with alt text; captions are optional and come only from the couple.
+- `pnpm gen:gallery` makes WebP copies in `public/photos/gallery/` (up to 1600 px, plus an 800 px
+  copy for wider photos) in the photos' own colors, with no sepia toning, unlike the page
+  backdrops. It fixes camera rotation and strips metadata, including GPS location. It writes
+  `content/gallery.json`, which is committed so the build doesn't need ImageMagick.
+- The page is a column grid (one column on phones, up to three on desktop) of cream-framed
+  photos. Tapping one opens it full size in a lightbox with Previous/Next, arrow keys, swipe and
+  Esc; focus returns to the photo's thumbnail.
+- Optional `Photos intro` in DETAILS.md shows above the grid. With no photos the page says
+  "Photos coming soon".
+
+## Labyrinth
+- The real Abbo's Alley labyrinth is a classical 7-circuit brick labyrinth: one path, no wrong
+  turns. The game keeps its round 7-ring look but is a true maze, with branches and dead ends,
+  so there is something to solve.
+- The player chooses the fox or the deer and enters at the bottom of the outer ring, where the
+  real labyrinth's mouth is. The other animal waits in the center; reaching it ends the game
+  with a heart and the move count. "Walk it again" starts a new maze.
+- Brick-red walls (like the real labyrinth's brick lines) on an espresso ground inside a thin
+  cream rim. Arrow keys/WASD, swipe, or the on-screen pad move the animal.
+- On a circle "up" means different passages in different places, so each cell pairs its open
+  passages with the arrow keys that point most nearly along them, one key per passage. To make
+  that always possible, a cell has at most one outward passage (four passages at most), and the
+  center has exactly one way in.
+- Optional `Labyrinth intro` in DETAILS.md shows on the start screen.
 
 ## Privacy
 The site is hidden from search engines (`noindex` and robots.txt).

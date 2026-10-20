@@ -124,7 +124,7 @@ a:hover {
   padding: 0.75rem var(--gutter);
   background: rgb(31 22 16 / 0.85);
   backdrop-filter: blur(6px);
-  border-bottom: 1px solid rgb(168 139 106 / 0.25);
+  border-bottom: 3px solid #460404;
 }
 
 .nav-monogram {
@@ -136,7 +136,8 @@ a:hover {
 
 .nav-links {
   display: flex;
-  gap: 1.25rem;
+  flex-wrap: wrap;
+  gap: 0.25rem 1.25rem;
   margin: 0;
   padding: 0;
   list-style: none;
@@ -151,6 +152,12 @@ a:hover {
 
 .nav-links a[aria-current="page"] {
   border-bottom-color: var(--sepia-300);
+}
+
+@media (max-width: 30rem) {
+  .nav-links {
+    column-gap: 0.9rem;
+  }
 }
 
 /* Buttons and forms */

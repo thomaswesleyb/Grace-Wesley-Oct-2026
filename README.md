@@ -1,7 +1,8 @@
 # parkhillbaileywedding.com
 
-Wedding site for Grace Parkhill and Wesley Bailey: the invitation, Q&A, and RSVP. It runs as one
-Cloudflare Worker (React app + small API) with a D1 database.
+Wedding site for Grace Parkhill and Wesley Bailey: the invitation, Q&A, RSVP, photos, and a
+labyrinth maze game. It runs as one Cloudflare Worker (React app + small API) with a D1
+database.
 
 ## Commands
 
@@ -12,6 +13,7 @@ Requires Node 22 (`nvm use 22`) and pnpm 12.
 | `pnpm install` | Install pinned dependencies (install scripts blocked) |
 | `pnpm dev` | Local site + API at http://localhost:5173 (local D1) |
 | `pnpm gen` | Rebuild `content/details.json` from `DETAILS.md`; lists hidden Q&A entries |
+| `pnpm gen:gallery` | Make web copies of `images/` (listed in its `captions.csv`) and rebuild `content/gallery.json`; needs ImageMagick |
 | `pnpm check` | Lint, format check, type check, tests |
 | `pnpm db:migrate:local` / `db:migrate:remote` | Apply `migrations/` to the local or production database |
 | `pnpm seed:guests <file.csv> --local\|--remote [--release-wave 1]` | Load the guest list |

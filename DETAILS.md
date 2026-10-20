@@ -29,6 +29,11 @@ Invitation wording: "Grace A. Parkhill and T. Wesley Bailey invite you to join u
 celebrate our wedding day. October 23, 2027, 5:00 pm. All Saints Chapel, Sewanee, Tennessee.
 Kindly RSVP on our website: parkhillbaileywedding.com"
 
+## Photos and Labyrinth
+
+Photos intro: {{ PHOTOS_INTRO }}
+Labyrinth intro: {{ LABYRINTH_INTRO }}
+
 ## RSVP Deadline
 
 RSVP deadline, wave 1: March 30th, 2027

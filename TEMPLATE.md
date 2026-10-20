@@ -73,6 +73,12 @@ RSVP deadline, wave 1: {{ WAVE_1_DEADLINE }}   <!-- e.g. "March 1, 2027" -->
 RSVP deadline, wave 2: {{ WAVE_2_DEADLINE }}
 RSVP deadline, wave 3: {{ WAVE_3_DEADLINE }}
 
+## Photos and Labyrinth
+
+<!-- Optional. Each intro shows on its page only once it is filled in. -->
+Photos intro: {{ PHOTOS_INTRO }}
+Labyrinth intro: {{ LABYRINTH_INTRO }}   <!-- e.g. a line about the labyrinth in Abbo's Alley -->
+
 ## Q&A
 
 <!-- Each answer appears on the Q&A page only once it is filled in. -->

@@ -46,12 +46,49 @@ describe("buildContent", () => {
     expect(hiddenQuestions).toContain("What should I wear?");
   });
 
+  it("answers when, how to RSVP and whom to contact from DETAILS.md", () => {
+    const { content } = buildContent(
+      parseDetails(`${BASE}
+Wedding time zone: America/Chicago
+Couple contact: us@example.com
+RSVP method: online, via the website
+RSVP deadline, wave 1: March 30th, 2027
+RSVP deadline, wave 2: June 30th, 2027`),
+    );
+    const answer = (question: string) => content.qa.find((q) => q.question === question)?.answer;
+    expect(answer("When is the wedding?")).toBe(
+      "October 23, 2027. The ceremony begins at 5:00 pm Central Time.",
+    );
+    expect(answer("Who can I contact with questions?")).toBe("Email us at us@example.com.");
+    const rsvp = answer("How do I RSVP?");
+    expect(rsvp).toContain("parkhillbaileywedding.com");
+    expect(rsvp).not.toMatch(/March|June|wave/i);
+  });
+
+  it("hides the wedding-time answer until the time zone is known", () => {
+    const { hiddenQuestions } = buildContent(parseDetails(BASE));
+    expect(hiddenQuestions).toContain("When is the wedding?");
+  });
+
   it("uses short first names and keeps the contact placeholder visible", () => {
     const { content, warnings } = buildContent(parseDetails(BASE));
     expect(content.brideShort).toBe("Grace");
     expect(content.groomShort).toBe("Wesley");
     expect(content.contact).toBe("{{ COUPLE_CONTACT }}");
     expect(warnings.some((w) => w.includes("Couple contact"))).toBe(true);
+  });
+
+  it("leaves the page intros out until they are filled in", () => {
+    const empty = buildContent(
+      parseDetails(`${BASE}\nPhotos intro: {{ PHOTOS_INTRO }}\nLabyrinth intro: {{ X }}`),
+    );
+    expect(empty.content.photosIntro).toBeNull();
+    expect(empty.content.labyrinthIntro).toBeNull();
+    const filled = buildContent(
+      parseDetails(`${BASE}\nPhotos intro: A few favorites.\nLabyrinth intro: Find the way in.`),
+    );
+    expect(filled.content.photosIntro).toBe("A few favorites.");
+    expect(filled.content.labyrinthIntro).toBe("Find the way in.");
   });
 
   it("hides the countdown until the time zone is known", () => {

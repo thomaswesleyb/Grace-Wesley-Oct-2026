@@ -20,10 +20,16 @@ export function Layout() {
               </NavLink>
             </li>
             <li>
-              <NavLink to="/qa">Q&amp;A</NavLink>
+              <NavLink to="/qa">Info</NavLink>
             </li>
             <li>
               <NavLink to="/rsvp">RSVP</NavLink>
+            </li>
+            <li>
+              <NavLink to="/photos">Photos</NavLink>
+            </li>
+            <li>
+              <NavLink to="/labyrinth">Labyrinth</NavLink>
             </li>
             <li>
               <NavLink to="/registry">Registry</NavLink>

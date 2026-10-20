@@ -51,7 +51,8 @@ Match the site to the invitation's look:
   (Old English/Fraktur style) for the date and time only
 - **Ornament:** engraved filigree corner pieces and lattice side borders, in a vintage-formal
   style
-- **Pages:** Home (invitation), Q&A (includes travel and lodging), RSVP, and Registry (phase 2)
+- **Pages:** Home (invitation), Q&A (includes travel and lodging), RSVP, Photos (engagement and
+  curated photos), Labyrinth (a maze game modeled on Abbo's Alley), and Registry (phase 2)
 
 Write design decisions to `wedding-design.md` so later sessions keep them consistent.
 

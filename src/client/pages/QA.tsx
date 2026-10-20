@@ -15,7 +15,7 @@ export function QA() {
     <>
       <Backdrop src="/photos/natural-bridge.webp" position="center 40%" />
       <section className="page">
-        <h1>Questions &amp; Answers</h1>
+        <h1>Important Information</h1>
         <p className="lede">More answers will appear here as plans come together.</p>
         {topics.map(({ topic, entries }) => (
           <section key={topic} className="qa-topic" aria-labelledby={`topic-${topic}`}>

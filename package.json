@@ -4,6 +4,7 @@
   "type": "module",
   "scripts": {
     "gen": "tsx scripts/gen-content.ts",
+    "gen:gallery": "tsx scripts/gen-gallery.ts",
     "predev": "pnpm gen",
     "dev": "vite",
     "prebuild": "pnpm gen",

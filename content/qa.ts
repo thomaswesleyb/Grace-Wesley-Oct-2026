@@ -1,5 +1,10 @@
 /** Labels exactly as they appear in DETAILS.md (`Label: value`). */
 export type FactLabel =
+  | "Wedding date"
+  | "Ceremony start time"
+  | "Wedding time zone"
+  | "Website URL"
+  | "Couple contact"
   | "Ceremony venue"
   | "Ceremony address line"
   | "Ceremony city, state"
@@ -29,6 +34,12 @@ export interface QaEntry {
   answer: (fact: (label: FactLabel) => string | undefined) => string;
 }
 
+/** "America/Chicago" → "Central Time", so travelers near a zone line know which clock to use. */
+const zoneName = (timeZone: string) =>
+  new Intl.DateTimeFormat("en-US", { timeZone, timeZoneName: "longGeneric" })
+    .formatToParts(0)
+    .find((part) => part.type === "timeZoneName")?.value ?? timeZone;
+
 const passthrough = (label: FactLabel) => (fact: (l: FactLabel) => string | undefined) =>
   fact(label) ?? "";
 
@@ -41,6 +52,14 @@ export const QA_ENTRIES: QaEntry[] = [
       [fact("Ceremony venue"), fact("Ceremony address line"), fact("Ceremony city, state")]
         .filter(Boolean)
         .join(", "),
+  },
+  {
+    topic: "The day of",
+    question: "When is the wedding?",
+    requires: ["Wedding date", "Ceremony start time", "Wedding time zone"],
+    answer: (fact) =>
+      `${fact("Wedding date")}. The ceremony begins at ${fact("Ceremony start time")} ` +
+      `${zoneName(fact("Wedding time zone") ?? "")}.`,
   },
   {
     topic: "Getting there",
@@ -111,8 +130,10 @@ export const QA_ENTRIES: QaEntry[] = [
   {
     topic: "Registry & more",
     question: "How do I RSVP?",
-    requires: ["RSVP method"],
-    answer: passthrough("RSVP method"),
+    requires: ["RSVP method", "Website URL"],
+    answer: (fact) =>
+      `RSVP ${fact("RSVP method")}: ${fact("Website URL")}. Enter your first and last name on ` +
+      "the RSVP page to find your invitation. Your respond-by date is shown there.",
   },
   {
     topic: "Registry & more",
@@ -131,5 +152,11 @@ export const QA_ENTRIES: QaEntry[] = [
     question: "What is there to do nearby?",
     requires: ["Things to do nearby"],
     answer: passthrough("Things to do nearby"),
+  },
+  {
+    topic: "Registry & more",
+    question: "Who can I contact with questions?",
+    requires: ["Couple contact"],
+    answer: (fact) => `Email us at ${fact("Couple contact")}.`,
   },
 ];

@@ -191,6 +191,8 @@ export function buildContent(facts: Facts): BuildResult {
       startsAt,
       contact,
       registryIntro: facts.get("Registry intro") ?? null,
+      photosIntro: facts.get("Photos intro") ?? null,
+      labyrinthIntro: facts.get("Labyrinth intro") ?? null,
       qa,
     },
     hiddenQuestions,
