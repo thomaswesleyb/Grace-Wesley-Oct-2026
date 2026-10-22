@@ -6,7 +6,7 @@ The wedding website should include the following discrete page components:
 1) A title page, which is an interactive version of the wedding invitation and may contain enough information on the page to overflow requiring scrolling.
 2) A Q&A page, which includes important expected questions such as how to get to certain locations. If the details are not provided in DETAILS.md, the question is hidden until the answer is added.
 3) A wedding registry page. This is the most technically involved page. It will include every item in wedding-registry.csv, and a visual horizontal bar with a progress marker that fills up as money is donated. This includes a donate button, and should be wired in with a payment platform using an API.
-4) An RSVP page. Guests find their invitation by name and respond for everyone on it.
+4) An RSVP page. Guests enter a shared code, then respond for everyone in their party.
 5) A Photos page: the engagement photos and other pictures the couple picks.
 6) A Labyrinth page: a small maze game modeled on the brick labyrinth in Abbo's Alley, Sewanee.
 
@@ -21,13 +21,14 @@ There is no separate Our Story or Travel & Stay page; travel and lodging live in
 - **Photo:** the original couple photo (`image0.png`, unmodified) is cropped to the photo area and
   toned to match the invitation (black point rgb(35 20 4), white point rgb(90 72 49)), saved as
   `public/photos/couple-sepia.webp`.
-- **Page backdrops:** each page has a fixed photo behind its content, all toned the same way
+- **Page backdrops:** a photo sits behind each page's content, toned the same way everywhere
   (blurred, dimmed, pulled toward sepia, darker toward the bottom) by the shared `Backdrop`
-  component. Home: All Saints Chapel (`all-saints.png`). Q&A: Natural Bridge
-  (`natural-bridge.png`, downscaled to 800 px wide). RSVP: Bridal Veil Falls
-  (`bridal-veil.png`). Registry: the overlook (`greensview.png`). Use only photos the couple has rights to (the first bridal-veil photo
-  carried a photographer's watermark and was replaced). Originals stay unmodified; the site serves
-  WebP copies from `public/photos/`.
+  component. Home always uses All Saints Chapel (`all-saints.png`). Every other page except
+  admin shows a random photo from `background-images/`, picked again on each page visit and
+  never the same as the previous page's (decided 2026-10-21). `pnpm gen:backdrops` (also run by
+  `pnpm dev` and `pnpm build`) makes 1280 px WebP copies in `public/photos/backdrops/` and lists
+  them in `content/backdrops.json`. Use only photos the couple has rights to. Originals stay
+  unmodified.
 - **Type:** Playfair Display SC for names and body text. UnifrakturMaguntia (blackletter) for the
   date and time only. Both fonts are self-hosted.
 - **Ornament:** SVG lattice side borders and filigree corner pieces traced from the invitation.
@@ -56,23 +57,29 @@ accessibility); registry and other. Each entry appears only when its answer is i
   the couple. The public sees bars and dollar amounts.
 
 ## RSVP
-- The guest list is split into waves 1, 2 and 3 against a 90-seat target. The couple sends later
-  waves as seats open, and marks each invitation "sent" in the admin page.
-- A guest enters their full first and last name. Invitations that haven't been sent yet get the
-  same "not found" message as a stranger, so no guest can tell which wave they're in.
-- One person answers for everyone on the invitation: accept/decline and dietary needs per
-  person, a plus-one where allowed, and an email, song request and note per invitation.
-- Each wave has its own respond-by date. Guests can edit until then through a link emailed to
-  them. Changing a decline to an accept only works while seats are open.
+- The form is unlocked with one shared code (decided 2026-10-21; it replaced a name lookup
+  against a guest list with waves). The code is checked on the server and never ships to the
+  browser.
+- Only the RSVP form is behind the code. Home, Q&A, Photos and Labyrinth stay public.
+- One person answers for their party, up to 6 people: each person's name, accept or decline,
+  and dietary needs, plus an email, song request and note.
+- No deadline is shown on the site. The couple gives each group its date when inviting them,
+  and closes the form when they're done.
+- Each RSVP is saved and listed in admin, and emailed to the couple. To change an answer, guests
+  contact the couple.
 
 ## Photos
-- The couple puts originals in `images/` (JPEG, PNG, WebP or HEIC; never modified) with
-  `images/captions.csv` (`file,caption,alt`). The CSV sets the order. Every photo needs
-  a row with alt text; captions are optional and come only from the couple.
-- `pnpm gen:gallery` makes WebP copies in `public/photos/gallery/` (up to 1600 px, plus an 800 px
-  copy for wider photos) in the photos' own colors, with no sepia toning, unlike the page
-  backdrops. It fixes camera rotation and strips metadata, including GPS location. It writes
-  `content/gallery.json`, which is committed so the build doesn't need ImageMagick.
+- Every photo in `images/` (JPEG, PNG, WebP or HEIC; never modified) is shown. Adding or
+  removing a file is all it takes (decided 2026-10-21, replacing a required CSV row per photo).
+- `images/captions.csv` (`file,caption,alt`) is optional. Photos with a row come first, in CSV
+  order, with that caption and alt text. The rest follow in natural file-name order with the
+  alt text "Photo N of M". Captions and descriptions come only from the couple.
+- `pnpm gen:gallery` (also run by `pnpm dev` and `pnpm build`) makes WebP copies in
+  `public/photos/gallery/` (up to 1600 px, plus an 800 px copy for wider photos) in the photos'
+  own colors, with no sepia toning, unlike the page backdrops. It fixes camera rotation and
+  strips metadata, including GPS location, and skips photos whose copies are up to date. It
+  writes `content/gallery.json`, which is committed. If `images/` has no photos (e.g. a fresh
+  clone without the originals), it leaves the current gallery as it is.
 - The page is a column grid (one column on phones, up to three on desktop) of cream-framed
   photos. Tapping one opens it full size in a lightbox with Previous/Next, arrow keys, swipe and
   Esc; focus returns to the photo's thumbnail.

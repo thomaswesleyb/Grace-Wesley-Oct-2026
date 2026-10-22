@@ -1,24 +1,17 @@
 import { useState } from "react";
 import { apiFetch, ApiRequestError } from "@client/api.ts";
-import { Backdrop } from "@client/components/Backdrop.tsx";
 import {
+  CodeStep,
   DetailsStep,
   DoneStep,
-  FindStep,
   RespondStep,
   ReviewStep,
 } from "@client/pages/RsvpSteps.tsx";
-import { emptyDraft, formatDate, toSubmission, type Draft } from "@client/pages/rsvp-state.ts";
-import { site } from "@client/site.ts";
-import {
-  lookupResponse,
-  rsvpResult,
-  type InvitationView,
-  type RsvpResult,
-} from "@shared/schemas.ts";
+import { emptyDraft, toSubmission, type Draft } from "@client/pages/rsvp-state.ts";
+import { rsvpResult, unlockResponse, type RsvpResult } from "@shared/schemas.ts";
 import "@client/pages/rsvp.css";
 
-type Step = "find" | "respond" | "details" | "review" | "done";
+type Step = "code" | "respond" | "details" | "review" | "done";
 
 const STEP_LABELS: [Step, string][] = [
   ["respond", "Respond"],
@@ -43,38 +36,10 @@ function Progress({ step }: { step: Step }) {
   );
 }
 
-function Locked({ invitation }: { invitation: InvitationView }) {
-  const attending = invitation.guests.filter((g) => g.attending === true);
-  const declining = invitation.guests.filter((g) => g.attending === false);
-  return (
-    <div className="panel">
-      <h2 className="rsvp-label">{invitation.label}</h2>
-      {invitation.responded ? (
-        <>
-          <p>Thank you, we have your RSVP.</p>
-          {attending.length > 0 && (
-            <p>Attending: {attending.map((g) => `${g.firstName} ${g.lastName}`).join(", ")}</p>
-          )}
-          {declining.length > 0 && (
-            <p>Declining: {declining.map((g) => `${g.firstName} ${g.lastName}`).join(", ")}</p>
-          )}
-          <p className="rsvp-muted">To change your RSVP, please contact us: {site.contact}</p>
-        </>
-      ) : (
-        <p>
-          RSVPs for this invitation closed
-          {invitation.respondBy === null ? "" : ` on ${formatDate(invitation.respondBy)}`}. Please
-          contact us: {site.contact}
-        </p>
-      )}
-    </div>
-  );
-}
-
 function useRsvpFlow() {
-  const [step, setStep] = useState<Step>("find");
-  const [invitation, setInvitation] = useState<InvitationView | null>(null);
-  const [draft, setDraft] = useState<Draft | null>(null);
+  const [step, setStep] = useState<Step>("code");
+  const [code, setCode] = useState("");
+  const [draft, setDraft] = useState<Draft>(emptyDraft);
   const [result, setResult] = useState<RsvpResult | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -99,27 +64,20 @@ function useRsvpFlow() {
     }
   };
 
-  const find = (firstName: string, lastName: string) =>
+  const unlock = (typed: string) =>
     run(async () => {
-      const body = { firstName, lastName };
-      const reply = await apiFetch("/api/rsvp/lookup", lookupResponse, { method: "POST", body });
-      if (!reply.found) {
-        setError(
-          `We couldn't find that name. Try it exactly as written on your invitation, or contact us: ${site.contact}`,
-        );
-        return;
-      }
-      setInvitation(reply.invitation);
-      setDraft(emptyDraft(reply.invitation));
+      await apiFetch("/api/rsvp/unlock", unlockResponse, {
+        method: "POST",
+        body: { code: typed },
+      });
+      setCode(typed);
       goTo("respond");
     });
 
-  const submit = (current: InvitationView, currentDraft: Draft) =>
+  const submit = () =>
     run(async () => {
-      const path = `/api/rsvp/${encodeURIComponent(current.id)}`;
-      setResult(
-        await apiFetch(path, rsvpResult, { method: "POST", body: toSubmission(currentDraft) }),
-      );
+      const body = toSubmission(code, draft);
+      setResult(await apiFetch("/api/rsvp", rsvpResult, { method: "POST", body }));
       goTo("done");
     });
 
@@ -128,36 +86,17 @@ function useRsvpFlow() {
     setDraft(next);
   };
 
-  return {
-    step,
-    invitation,
-    draft,
-    result,
-    busy,
-    error,
-    updateDraft,
-    setError,
-    goTo,
-    find,
-    submit,
-  };
+  return { step, draft, result, busy, error, updateDraft, setError, goTo, unlock, submit };
 }
 
-type Flow = ReturnType<typeof useRsvpFlow>;
-
-interface StepProps {
-  flow: Flow;
-  invitation: InvitationView;
-  draft: Draft;
-}
-
-function StepBody({ flow, invitation, draft }: StepProps) {
+function StepBody({ flow }: { flow: ReturnType<typeof useRsvpFlow> }) {
   switch (flow.step) {
+    case "code":
+      return <CodeStep busy={flow.busy} onUnlock={flow.unlock} />;
     case "respond":
       return (
         <RespondStep
-          invitation={invitation}
-          draft={draft}
+          draft={flow.draft}
           onChange={flow.updateDraft}
           onNext={() => flow.goTo("details")}
           onError={flow.setError}
@@ -166,7 +105,7 @@ function StepBody({ flow, invitation, draft }: StepProps) {
     case "details":
       return (
         <DetailsStep
-          draft={draft}
+          draft={flow.draft}
           onChange={flow.updateDraft}
           onBack={() => flow.goTo("respond")}
           onNext={() => flow.goTo("review")}
@@ -174,38 +113,18 @@ function StepBody({ flow, invitation, draft }: StepProps) {
       );
     case "review":
       return (
-        <ReviewStep
-          invitation={invitation}
-          draft={draft}
-          busy={flow.busy}
-          onEdit={flow.goTo}
-          onSubmit={() => flow.submit(invitation, draft)}
-        />
+        <ReviewStep draft={flow.draft} busy={flow.busy} onEdit={flow.goTo} onSubmit={flow.submit} />
       );
     case "done":
       return flow.result === null ? null : <DoneStep result={flow.result} />;
-    case "find":
-      return null;
   }
-}
-
-function StepView(props: StepProps) {
-  const { invitation, flow } = props;
-  if (invitation.responded || invitation.closed) return <Locked invitation={invitation} />;
-  return (
-    <>
-      {flow.step !== "done" && <Progress step={flow.step} />}
-      <StepBody {...props} />
-    </>
-  );
 }
 
 export function Rsvp() {
   const flow = useRsvpFlow();
-  const { invitation, draft } = flow;
+  const showProgress = flow.step !== "code" && flow.step !== "done";
   return (
     <>
-      <Backdrop src="/photos/bridal-veil.webp" position="center 40%" />
       <section className="page rsvp">
         <h1>RSVP</h1>
         <p className="lede">We would be honored by your presence.</p>
@@ -214,11 +133,8 @@ export function Rsvp() {
             {flow.error}
           </p>
         )}
-        {flow.step === "find" || invitation === null || draft === null ? (
-          <FindStep busy={flow.busy} onFind={flow.find} />
-        ) : (
-          <StepView flow={flow} invitation={invitation} draft={draft} />
-        )}
+        {showProgress && <Progress step={flow.step} />}
+        <StepBody flow={flow} />
       </section>
     </>
   );

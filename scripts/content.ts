@@ -199,24 +199,3 @@ export function buildContent(facts: Facts): BuildResult {
     warnings,
   };
 }
-
-/** Parses "March 1, 2027" into "2027-03-01". */
-export function parseIsoDate(date: string): string {
-  const d = DATE.exec(date.trim());
-  const month = d ? MONTHS.indexOf(d[1]!.toLowerCase()) : -1;
-  if (!d || month < 0)
-    throw new Error(
-      `Can't parse date "${date}". Use the form "March 30, 2027" or "March 30th, 2027".`,
-    );
-  return `${d[3]}-${String(month + 1).padStart(2, "0")}-${d[2]!.padStart(2, "0")}`;
-}
-
-/** Wave deadlines from `RSVP deadline, wave N: <date>` lines. */
-export function waveDeadlines(facts: Facts): Map<number, string> {
-  const deadlines = new Map<number, string>();
-  for (const wave of [1, 2, 3]) {
-    const value = facts.get(`RSVP deadline, wave ${wave}`);
-    if (value !== undefined) deadlines.set(wave, parseIsoDate(value));
-  }
-  return deadlines;
-}

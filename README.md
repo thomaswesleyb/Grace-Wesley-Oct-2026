@@ -13,32 +13,30 @@ Requires Node 22 (`nvm use 22`) and pnpm 12.
 | `pnpm install` | Install pinned dependencies (install scripts blocked) |
 | `pnpm dev` | Local site + API at http://localhost:5173 (local D1) |
 | `pnpm gen` | Rebuild `content/details.json` from `DETAILS.md`; lists hidden Q&A entries |
-| `pnpm gen:gallery` | Make web copies of `images/` (listed in its `captions.csv`) and rebuild `content/gallery.json`; needs ImageMagick |
+| `pnpm gen:gallery` | Make web copies of every photo in `images/` and rebuild `content/gallery.json` (`dev` and `build` run it too); needs ImageMagick. Optional `images/captions.csv` (`file,caption,alt`) adds captions, descriptions and order |
+| `pnpm gen:backdrops` | Make blurred-backdrop copies of every photo in `background-images/` and rebuild `content/backdrops.json` (`dev` and `build` run it too). Every page except Home and admin picks one at random |
 | `pnpm check` | Lint, format check, type check, tests |
 | `pnpm db:migrate:local` / `db:migrate:remote` | Apply `migrations/` to the local or production database |
-| `pnpm seed:guests <file.csv> --local\|--remote [--release-wave 1]` | Load the guest list |
 | `pnpm seed:registry --local\|--remote [file.csv]` | Load or update registry items (default `wedding-registry.csv`) |
 | `pnpm deploy` | Build and deploy to Cloudflare |
 
 Site facts come from `DETAILS.md`. Edit it, then run `pnpm gen` (dev and build run it for you).
 
-## Guest list
+## RSVP
 
-CSV columns: `invitation,first_name,last_name,plus_one_allowed,wave,priority`, plus an optional
-`email` column.
+Guests unlock the RSVP form with a shared code. There's no guest list on the site.
 
-- One row per person. Rows sharing an `invitation` value are answered together. A blank
-  `invitation` makes a solo invitation named after the guest.
-- `plus_one_allowed`: yes/no. `wave`: 1, 2 or 3. `priority`: optional, 1 = send first.
-- `email`: optional, one per person, for emailing invitations later. Blank is fine (kids, no
-  address yet). It shows in admin and the CSV export as `invite_email`, and never on the RSVP
-  page. It's separate from the email guests type when they RSVP (`rsvp_email`).
-- Keep the file outside git. Names matching `guests*.csv` are gitignored and blocked by the hook.
-- Seeding refuses to run if the database already has invitations, so it can't duplicate guests.
-- Only invitations marked sent can be found on the RSVP page. Everyone else, held waves included,
-  gets the same "we couldn't find that name" reply.
-
-Wave deadlines come from `RSVP deadline, wave N: March 1, 2027` lines in `DETAILS.md`.
+- The code is the `RSVP_CODE` secret (`pnpm exec wrangler secret put RSVP_CODE`; locally, a
+  `RSVP_CODE=…` line in `.dev.vars`). It never reaches the browser or the repo. Case, spaces,
+  dashes, slashes and dots are ignored, so `10/23/2027` matches `10232027`. While it's unset,
+  every RSVP is refused with "RSVPs aren't open yet."
+- The server checks the code when the form is unlocked and again on submit. Both share a limit
+  of 10 tries a minute per IP address.
+- One form covers up to 6 people: name, accept or decline, and dietary needs for each, plus an
+  email, song request and note. Each submission is saved and emailed to `ALERT_TO`.
+- Nothing stops a household from sending twice. Admin lists every submission, newest first.
+- To close RSVPs, set `rsvp_open` to `0`:
+  `pnpm exec wrangler d1 execute wedding --remote --command "UPDATE settings SET value = '0' WHERE key = 'rsvp_open'"`.
 
 ## Registry
 
@@ -62,7 +60,7 @@ To hide the page before launch, remove the Registry link in `src/client/componen
 3. `pnpm exec wrangler d1 create wedding`, then paste the printed `database_id` into
    `wrangler.jsonc`.
 4. `pnpm db:migrate:remote`
-5. `pnpm seed:guests path/to/guests.csv --remote --release-wave 1`
+5. `pnpm exec wrangler secret put RSVP_CODE`, and type the code when asked.
 6. `pnpm deploy`, then attach the custom domain to the Worker in the Cloudflare dashboard.
 7. **Protect admin:** Zero Trust → Access → Applications → self-hosted app for
    `parkhillbaileywedding.com/admin*` and `parkhillbaileywedding.com/api/admin*`, policy "Emails"

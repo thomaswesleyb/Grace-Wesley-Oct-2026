@@ -1,177 +1,148 @@
 import { useState, type FormEvent } from "react";
 import { Link } from "react-router";
 import {
-  activePlusOne,
-  formatDate,
+  addPerson,
+  canAddPerson,
+  removePerson,
   respondProblem,
+  updatePerson,
   type Draft,
-  type PlusOneDraft,
+  type PersonDraft,
 } from "@client/pages/rsvp-state.ts";
-import type { InvitationGuest, InvitationView, RsvpResult } from "@shared/schemas.ts";
+import { site } from "@client/site.ts";
+import { MAX_PARTY, type RsvpResult } from "@shared/schemas.ts";
 
-const fullName = (g: { firstName: string; lastName: string }) => `${g.firstName} ${g.lastName}`;
+const fullName = (p: { firstName: string; lastName: string }) =>
+  `${p.firstName.trim()} ${p.lastName.trim()}`.trim();
 
-export function FindStep({
-  busy,
-  onFind,
-}: {
-  busy: boolean;
-  onFind: (first: string, last: string) => void;
-}) {
-  const [firstName, setFirstName] = useState("");
-  const [lastName, setLastName] = useState("");
+export function CodeStep({ busy, onUnlock }: { busy: boolean; onUnlock: (code: string) => void }) {
+  const [code, setCode] = useState("");
   const submit = (event: FormEvent) => {
     event.preventDefault();
-    onFind(firstName, lastName);
+    onUnlock(code);
   };
   return (
     <form className="panel" onSubmit={submit}>
-      <h2 className="rsvp-label">Find your invitation</h2>
-      <p className="rsvp-muted">Enter your name as it appears on your invitation.</p>
-      <div className="row">
-        <div className="field">
-          <label htmlFor="first-name">First name</label>
-          <input
-            id="first-name"
-            autoComplete="given-name"
-            required
-            maxLength={60}
-            value={firstName}
-            onChange={(e) => setFirstName(e.target.value)}
-          />
-        </div>
-        <div className="field">
-          <label htmlFor="last-name">Last name</label>
-          <input
-            id="last-name"
-            autoComplete="family-name"
-            required
-            maxLength={60}
-            value={lastName}
-            onChange={(e) => setLastName(e.target.value)}
-          />
-        </div>
+      <h2 className="rsvp-label">Enter your RSVP code</h2>
+      <p className="rsvp-muted">Don't have it? Contact us: {site.contact}</p>
+      <div className="field">
+        <label htmlFor="rsvp-code">RSVP code</label>
+        <input
+          id="rsvp-code"
+          autoComplete="off"
+          inputMode="numeric"
+          required
+          maxLength={40}
+          value={code}
+          onChange={(e) => setCode(e.target.value)}
+        />
       </div>
       <div className="actions">
         <button className="button" type="submit" disabled={busy}>
-          {busy ? "Searching…" : "Find my invitation"}
+          {busy ? "Checking…" : "Continue"}
         </button>
       </div>
     </form>
   );
 }
 
-interface GuestProps {
-  guest: InvitationGuest;
+interface PersonProps {
+  person: PersonDraft;
+  index: number;
   draft: Draft;
   onChange: (draft: Draft) => void;
 }
 
-function PlusOneFields({ guest, draft, onChange }: GuestProps) {
-  const plusOne = draft.plusOnes[guest.id];
-  if (plusOne === undefined || draft.answers[guest.id]?.attending !== true) return null;
-  const update = (patch: Partial<PlusOneDraft>) =>
-    onChange({ ...draft, plusOnes: { ...draft.plusOnes, [guest.id]: { ...plusOne, ...patch } } });
+function NameFields({ person, draft, onChange }: PersonProps) {
+  const id = person.key;
   return (
-    <div className="rsvp-plus-one">
-      <label className="rsvp-check">
+    <div className="row">
+      <div className="field">
+        <label htmlFor={`first-${id}`}>First name</label>
         <input
-          type="checkbox"
-          checked={plusOne.bringing}
-          onChange={(e) => update({ bringing: e.target.checked })}
+          id={`first-${id}`}
+          required
+          maxLength={60}
+          value={person.firstName}
+          onChange={(e) => onChange(updatePerson(draft, id, { firstName: e.target.value }))}
         />
-        I'm bringing a guest
-      </label>
-      {plusOne.bringing && (
-        <div className="row">
-          <div className="field">
-            <label htmlFor={`p1-first-${guest.id}`}>Guest's first name</label>
-            <input
-              id={`p1-first-${guest.id}`}
-              required
-              maxLength={60}
-              value={plusOne.firstName}
-              onChange={(e) => update({ firstName: e.target.value })}
-            />
-          </div>
-          <div className="field">
-            <label htmlFor={`p1-last-${guest.id}`}>Guest's last name</label>
-            <input
-              id={`p1-last-${guest.id}`}
-              required
-              maxLength={60}
-              value={plusOne.lastName}
-              onChange={(e) => update({ lastName: e.target.value })}
-            />
-          </div>
-          <div className="field">
-            <label htmlFor={`p1-diet-${guest.id}`}>Guest's dietary needs</label>
-            <input
-              id={`p1-diet-${guest.id}`}
-              maxLength={200}
-              value={plusOne.dietary}
-              onChange={(e) => update({ dietary: e.target.value })}
-            />
-          </div>
-        </div>
-      )}
+      </div>
+      <div className="field">
+        <label htmlFor={`last-${id}`}>Last name</label>
+        <input
+          id={`last-${id}`}
+          required
+          maxLength={60}
+          value={person.lastName}
+          onChange={(e) => onChange(updatePerson(draft, id, { lastName: e.target.value }))}
+        />
+      </div>
     </div>
   );
 }
 
-function GuestCard({ guest, draft, onChange }: GuestProps) {
-  const answer = draft.answers[guest.id];
-  if (answer === undefined) return null;
-  const update = (patch: Partial<typeof answer>) =>
-    onChange({ ...draft, answers: { ...draft.answers, [guest.id]: { ...answer, ...patch } } });
+function PersonCard(props: PersonProps) {
+  const { person, index, draft, onChange } = props;
+  const id = person.key;
+  const update = (patch: Partial<PersonDraft>) => onChange(updatePerson(draft, id, patch));
   return (
     <fieldset className="rsvp-guest">
-      <legend>{fullName(guest)}</legend>
+      <legend>{fullName(person) || (index === 0 ? "You" : "Another guest")}</legend>
+      <NameFields {...props} />
       <div className="rsvp-choice" role="radiogroup">
-        <label data-selected={answer.attending === true}>
+        <label data-selected={person.attending === true}>
           <input
             type="radio"
-            name={`attend-${guest.id}`}
-            checked={answer.attending === true}
+            name={`attend-${id}`}
+            checked={person.attending === true}
             onChange={() => update({ attending: true })}
           />
           Joyfully accepts
         </label>
-        <label data-selected={answer.attending === false}>
+        <label data-selected={person.attending === false}>
           <input
             type="radio"
-            name={`attend-${guest.id}`}
-            checked={answer.attending === false}
+            name={`attend-${id}`}
+            checked={person.attending === false}
             onChange={() => update({ attending: false })}
           />
           Regretfully declines
         </label>
       </div>
-      {answer.attending === true && (
+      {person.attending === true && (
         <div className="field">
-          <label htmlFor={`diet-${guest.id}`}>Dietary needs (optional)</label>
+          <label htmlFor={`diet-${id}`}>Dietary needs (optional)</label>
           <input
-            id={`diet-${guest.id}`}
+            id={`diet-${id}`}
             maxLength={200}
-            value={answer.dietary}
+            value={person.dietary}
             onChange={(e) => update({ dietary: e.target.value })}
           />
         </div>
       )}
-      <PlusOneFields guest={guest} draft={draft} onChange={onChange} />
+      {index > 0 && (
+        <div className="actions">
+          <button
+            className="button secondary"
+            type="button"
+            onClick={() => onChange(removePerson(draft, id))}
+          >
+            Remove
+          </button>
+        </div>
+      )}
     </fieldset>
   );
 }
 
 interface RespondProps {
-  invitation: InvitationView;
   draft: Draft;
   onChange: (draft: Draft) => void;
   onNext: () => void;
   onError: (message: string) => void;
 }
 
-export function RespondStep({ invitation, draft, onChange, onNext, onError }: RespondProps) {
+export function RespondStep({ draft, onChange, onNext, onError }: RespondProps) {
   const submit = (event: FormEvent) => {
     event.preventDefault();
     const problem = respondProblem(draft);
@@ -180,16 +151,29 @@ export function RespondStep({ invitation, draft, onChange, onNext, onError }: Re
   };
   return (
     <form className="panel" onSubmit={submit}>
-      <h2 className="rsvp-label">{invitation.label}</h2>
-      {invitation.respondBy !== null && (
-        <p className="rsvp-muted">Kindly respond by {formatDate(invitation.respondBy)}.</p>
-      )}
-      {invitation.guests
-        .filter((g) => !g.isPlusOne)
-        .map((guest) => (
-          <GuestCard key={guest.id} guest={guest} draft={draft} onChange={onChange} />
-        ))}
+      <h2 className="rsvp-label">Who's responding?</h2>
+      <p className="rsvp-muted">
+        Add everyone on your invitation, up to {MAX_PARTY} people, so we can count each seat.
+      </p>
+      {draft.people.map((person, index) => (
+        <PersonCard
+          key={person.key}
+          person={person}
+          index={index}
+          draft={draft}
+          onChange={onChange}
+        />
+      ))}
       <div className="actions">
+        {canAddPerson(draft) && (
+          <button
+            className="button secondary"
+            type="button"
+            onClick={() => onChange(addPerson(draft))}
+          >
+            Add another person
+          </button>
+        )}
         <button className="button" type="submit">
           Continue
         </button>
@@ -256,41 +240,26 @@ export function DetailsStep({ draft, onChange, onBack, onNext }: DetailsProps) {
 }
 
 interface ReviewProps {
-  invitation: InvitationView;
   draft: Draft;
   busy: boolean;
   onEdit: (step: "respond" | "details") => void;
   onSubmit: () => void;
 }
 
-export function ReviewStep({ invitation, draft, busy, onEdit, onSubmit }: ReviewProps) {
-  const active = activePlusOne(draft);
-  const guests = invitation.guests.filter((g) => !g.isPlusOne);
+export function ReviewStep({ draft, busy, onEdit, onSubmit }: ReviewProps) {
   return (
     <div className="panel">
       <h2 className="rsvp-label">Review your RSVP</h2>
       <dl className="rsvp-review">
-        {guests.map((guest) => {
-          const answer = draft.answers[guest.id];
-          return (
-            <div key={guest.id}>
-              <dt>{fullName(guest)}</dt>
-              <dd>
-                {answer?.attending ? "Joyfully accepts" : "Regretfully declines"}
-                {answer?.attending && answer.dietary.trim() ? ` · ${answer.dietary.trim()}` : ""}
-              </dd>
-            </div>
-          );
-        })}
-        {active !== null && (
-          <div>
-            <dt>{fullName(active.plusOne)} (guest)</dt>
+        {draft.people.map((person) => (
+          <div key={person.key}>
+            <dt>{fullName(person)}</dt>
             <dd>
-              Joyfully accepts
-              {active.plusOne.dietary.trim() ? ` · ${active.plusOne.dietary.trim()}` : ""}
+              {person.attending ? "Joyfully accepts" : "Regretfully declines"}
+              {person.attending && person.dietary.trim() ? ` · ${person.dietary.trim()}` : ""}
             </dd>
           </div>
-        )}
+        ))}
         <div>
           <dt>Email</dt>
           <dd>{draft.email}</dd>
@@ -337,6 +306,7 @@ export function DoneStep({ result }: { result: RsvpResult }) {
       ) : (
         <p>You'll be missed, and we're grateful you let us know.</p>
       )}
+      <p className="rsvp-muted">To change your RSVP, please contact us: {site.contact}</p>
       <div className="actions">
         <Link className="button secondary" to="/qa">
           Questions &amp; Answers

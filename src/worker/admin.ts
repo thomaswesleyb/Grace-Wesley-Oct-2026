@@ -1,9 +1,8 @@
 import { Hono } from "hono";
 import { createMiddleware } from "hono/factory";
 import { createRemoteJWKSet, jwtVerify } from "jose";
-import { computeCapacity } from "@shared/capacity.ts";
 import type { AdminSummary } from "@shared/schemas.ts";
-import { getSetting, listAdminInvitations, listPaidContributions } from "@worker/db.ts";
+import { listAdminRsvps, listPaidContributions } from "@worker/db.ts";
 import type { Env } from "@worker/env.ts";
 
 const jwksByTeam = new Map<string, ReturnType<typeof createRemoteJWKSet>>();
@@ -43,20 +42,15 @@ export const admin = new Hono<{ Bindings: Env }>();
 admin.use("*", requireAccess);
 
 admin.get("/summary", async (c) => {
-  const invitations = await listAdminInvitations(c.env.DB);
-  const target = Number((await getSetting(c.env.DB, "capacity_target")) ?? "90");
-  const sentGuests = invitations
-    .filter((i) => i.status === "sent")
-    .flatMap((i) => i.guests)
-    .map((g) => ({
-      id: g.id,
-      attending: g.attending,
-      plusOneAllowed: g.plusOneAllowed,
-      plusOneOf: g.plusOneOf,
-    }));
+  const [rsvps, gifts] = await Promise.all([
+    listAdminRsvps(c.env.DB),
+    listPaidContributions(c.env.DB),
+  ]);
+  const people = rsvps.flatMap((r) => r.people);
+  const attending = people.filter((p) => p.attending).length;
   return c.json({
-    capacity: computeCapacity(sentGuests, target),
-    invitations,
-    gifts: await listPaidContributions(c.env.DB),
+    totals: { rsvps: rsvps.length, attending, declining: people.length - attending },
+    rsvps,
+    gifts,
   } satisfies AdminSummary);
 });

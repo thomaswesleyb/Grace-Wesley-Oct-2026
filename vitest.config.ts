@@ -30,7 +30,13 @@ export default defineConfig(async () => {
           plugins: [
             cloudflareTest({
               wrangler: { configPath: "./wrangler.jsonc" },
-              miniflare: { bindings: { TEST_MIGRATIONS: migrations, ADMIN_DEV_BYPASS: "0" } },
+              miniflare: {
+                bindings: {
+                  TEST_MIGRATIONS: migrations,
+                  ADMIN_DEV_BYPASS: "0",
+                  RSVP_CODE: "10232027",
+                },
+              },
             }),
           ],
           test: {

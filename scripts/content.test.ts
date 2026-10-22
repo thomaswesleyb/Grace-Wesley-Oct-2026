@@ -1,12 +1,5 @@
 import { describe, expect, it } from "vitest";
-import {
-  buildContent,
-  parseDetails,
-  parseIsoDate,
-  parseLocalDateTime,
-  toInstant,
-  waveDeadlines,
-} from "./content.ts";
+import { buildContent, parseDetails, parseLocalDateTime, toInstant } from "./content.ts";
 
 const BASE = `
 # Details
@@ -116,19 +109,13 @@ describe("dates", () => {
   });
 
   it("accepts ordinal day suffixes", () => {
-    expect(parseIsoDate("March 30th, 2027")).toBe("2027-03-30");
-    expect(parseIsoDate("June 1st, 2027")).toBe("2027-06-01");
+    expect(parseLocalDateTime("October 23rd, 2027", "5:00 pm")).toEqual([2027, 9, 23, 17, 0]);
+    expect(parseLocalDateTime("June 1st, 2027", "5:00 pm")).toEqual([2027, 5, 1, 17, 0]);
   });
 
   it("explains a time zone it doesn't recognize", () => {
     expect(() => buildContent(parseDetails(`${BASE}\nWedding time zone: Central Time`))).toThrow(
       /"Wedding time zone: Central Time".*America\/Chicago/,
     );
-  });
-
-  it("parses wave deadlines", () => {
-    expect(parseIsoDate("March 1, 2027")).toBe("2027-03-01");
-    const deadlines = waveDeadlines(parseDetails("RSVP deadline, wave 2: May 15, 2027"));
-    expect([...deadlines]).toEqual([[2, "2027-05-15"]]);
   });
 });

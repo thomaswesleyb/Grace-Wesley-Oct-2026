@@ -1,7 +1,6 @@
 import { useEffect, useState, type FormEvent } from "react";
 import { useSearchParams } from "react-router";
 import { apiFetch, ApiRequestError } from "@client/api.ts";
-import { Backdrop } from "@client/components/Backdrop.tsx";
 import { site } from "@client/site.ts";
 import {
   contributionProblem,
@@ -212,7 +211,6 @@ export function Registry() {
 
   return (
     <>
-      <Backdrop src="/photos/greensview.webp" position="center 62%" />
       <section className="page registry">
         <h1>Registry</h1>
         {site.registryIntro !== null && <p className="lede">{site.registryIntro}</p>}

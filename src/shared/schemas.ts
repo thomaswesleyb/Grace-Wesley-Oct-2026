@@ -10,57 +10,24 @@ const optionalText = (max: number) =>
     .nullable()
     .default(null);
 
-export const lookupRequest = z.object({
+/** Most people one RSVP form can answer for. */
+export const MAX_PARTY = 6;
+
+const rsvpCode = z.string().max(40);
+
+export const unlockRequest = z.object({ code: rsvpCode });
+export const unlockResponse = z.object({ ok: z.literal(true) });
+
+export const rsvpPerson = z.object({
   firstName: personName,
   lastName: personName,
+  attending: z.boolean(),
+  dietary: optionalText(200),
 });
-export type LookupRequest = z.infer<typeof lookupRequest>;
-
-export const invitationGuest = z.object({
-  id: z.string(),
-  firstName: z.string(),
-  lastName: z.string(),
-  plusOneAllowed: z.boolean(),
-  isPlusOne: z.boolean(),
-  attending: z.boolean().nullable(),
-});
-export type InvitationGuest = z.infer<typeof invitationGuest>;
-
-export const invitationView = z.object({
-  id: z.string(),
-  label: z.string(),
-  respondBy: z.string().nullable(),
-  closed: z.boolean(),
-  responded: z.boolean(),
-  guests: z.array(invitationGuest),
-});
-export type InvitationView = z.infer<typeof invitationView>;
-
-export const lookupResponse = z.discriminatedUnion("found", [
-  z.object({ found: z.literal(false) }),
-  z.object({ found: z.literal(true), invitation: invitationView }),
-]);
-export type LookupResponse = z.infer<typeof lookupResponse>;
 
 export const rsvpSubmission = z.object({
-  guests: z
-    .array(
-      z.object({
-        id: z.string().min(1),
-        attending: z.boolean(),
-        dietary: optionalText(200),
-      }),
-    )
-    .min(1),
-  plusOne: z
-    .object({
-      hostId: z.string().min(1),
-      firstName: personName,
-      lastName: personName,
-      dietary: optionalText(200),
-    })
-    .nullable()
-    .default(null),
+  code: rsvpCode,
+  people: z.array(rsvpPerson).min(1).max(MAX_PARTY),
   email: z.email().max(254),
   songRequest: optionalText(200),
   note: optionalText(1000),
@@ -71,39 +38,29 @@ export type ParsedRsvpSubmission = z.output<typeof rsvpSubmission>;
 export const rsvpResult = z.object({
   attending: z.number().int(),
   declining: z.number().int(),
-  respondBy: z.string().nullable(),
 });
 export type RsvpResult = z.infer<typeof rsvpResult>;
 
 export const apiError = z.object({ error: z.string() });
 export type ApiError = z.infer<typeof apiError>;
 
-export const adminGuest = z.object({
+export const adminRsvp = z.object({
   id: z.string(),
-  firstName: z.string(),
-  lastName: z.string(),
-  plusOneAllowed: z.boolean(),
-  plusOneOf: z.string().nullable(),
-  attending: z.boolean().nullable(),
-  dietary: z.string().nullable(),
-  inviteEmail: z.string().nullable(),
-});
-
-export const adminInvitation = z.object({
-  id: z.string(),
-  label: z.string(),
-  wave: z.number().int(),
-  priority: z.number().int(),
-  status: z.enum(["held", "sent"]),
-  sentAt: z.string().nullable(),
-  respondedAt: z.string().nullable(),
-  /** The address the guest typed when they RSVP'd. */
-  email: z.string().nullable(),
-  note: z.string().nullable(),
+  createdAt: z.string(),
+  email: z.string(),
   songRequest: z.string().nullable(),
-  guests: z.array(adminGuest),
+  note: z.string().nullable(),
+  people: z.array(
+    z.object({
+      id: z.string(),
+      firstName: z.string(),
+      lastName: z.string(),
+      attending: z.boolean(),
+      dietary: z.string().nullable(),
+    }),
+  ),
 });
-export type AdminInvitation = z.infer<typeof adminInvitation>;
+export type AdminRsvp = z.infer<typeof adminRsvp>;
 
 export const adminContribution = z.object({
   id: z.string(),
@@ -117,15 +74,13 @@ export const adminContribution = z.object({
 export type AdminContribution = z.infer<typeof adminContribution>;
 
 export const adminSummary = z.object({
-  capacity: z.object({
-    target: z.number(),
-    confirmed: z.number(),
-    declined: z.number(),
-    pending: z.number(),
-    open: z.number(),
-    forecast: z.number(),
+  totals: z.object({
+    rsvps: z.number().int(),
+    attending: z.number().int(),
+    declining: z.number().int(),
   }),
-  invitations: z.array(adminInvitation),
+  /** Newest first. */
+  rsvps: z.array(adminRsvp),
   gifts: z.array(adminContribution),
 });
 export type AdminSummary = z.infer<typeof adminSummary>;

@@ -4,61 +4,47 @@ import { formatDollars } from "@shared/registry.ts";
 import {
   adminSummary,
   type AdminContribution,
-  type AdminInvitation,
+  type AdminRsvp,
   type AdminSummary,
 } from "@shared/schemas.ts";
 import "@client/pages/admin.css";
 
-const answerText = (attending: boolean | null) =>
-  attending === null ? "No reply" : attending ? "Yes" : "No";
-
-const csvCell = (value: string | number | null) => {
-  const text = value === null ? "" : String(value);
+const csvCell = (value: string | null) => {
+  const text = value ?? "";
   return /[",\n]/.test(text) ? `"${text.replaceAll('"', '""')}"` : text;
 };
 
-/** One row per guest, including plus-ones, for spreadsheets and caterer counts. */
-export function toCsv(invitations: AdminInvitation[]): string {
+/** One row per person, for spreadsheets and caterer counts. `rsvp_id` groups a household. */
+export function toCsv(rsvps: AdminRsvp[]): string {
   const header = [
-    "invitation",
-    "wave",
-    "status",
+    "rsvp_id",
     "first_name",
     "last_name",
-    "plus_one_of",
     "attending",
     "dietary",
-    "invite_email",
-    "rsvp_email",
+    "email",
     "song_request",
     "note",
-    "responded_at",
+    "submitted_at",
   ];
-  const rows = invitations.flatMap((i) =>
-    i.guests.map((g) => {
-      const host = g.plusOneOf === null ? null : i.guests.find((h) => h.id === g.plusOneOf);
-      return [
-        i.label,
-        i.wave,
-        i.status,
-        g.firstName,
-        g.lastName,
-        host ? `${host.firstName} ${host.lastName}` : null,
-        answerText(g.attending),
-        g.dietary,
-        g.inviteEmail,
-        i.email,
-        i.songRequest,
-        i.note,
-        i.respondedAt,
-      ];
-    }),
+  const rows = rsvps.flatMap((r) =>
+    r.people.map((p) => [
+      r.id,
+      p.firstName,
+      p.lastName,
+      p.attending ? "Yes" : "No",
+      p.dietary,
+      r.email,
+      r.songRequest,
+      r.note,
+      r.createdAt,
+    ]),
   );
   return [header, ...rows].map((row) => row.map(csvCell).join(",")).join("\n");
 }
 
-function download(invitations: AdminInvitation[]) {
-  const url = URL.createObjectURL(new Blob([toCsv(invitations)], { type: "text/csv" }));
+function download(rsvps: AdminRsvp[]) {
+  const url = URL.createObjectURL(new Blob([toCsv(rsvps)], { type: "text/csv" }));
   const link = document.createElement("a");
   link.href = url;
   link.download = `rsvps-${new Date().toISOString().slice(0, 10)}.csv`;
@@ -66,13 +52,11 @@ function download(invitations: AdminInvitation[]) {
   URL.revokeObjectURL(url);
 }
 
-function CapacityTiles({ capacity }: { capacity: AdminSummary["capacity"] }) {
+function TotalTiles({ totals }: { totals: AdminSummary["totals"] }) {
   const tiles: [string, number, string][] = [
-    ["Confirmed", capacity.confirmed, "Guests who said yes"],
-    ["Pending", capacity.pending, "Seats held for sent invitations without a reply"],
-    ["Open", capacity.open, `Target ${capacity.target} − confirmed − pending`],
-    ["Forecast", capacity.forecast, "Expected final count at the current acceptance rate"],
-    ["Declined", capacity.declined, "Guests who said no"],
+    ["Attending", totals.attending, "People who said yes"],
+    ["Declining", totals.declining, "People who said no"],
+    ["RSVPs", totals.rsvps, "Forms received. A household that sent twice counts twice."],
   ];
   return (
     <div className="admin-tiles">
@@ -86,25 +70,21 @@ function CapacityTiles({ capacity }: { capacity: AdminSummary["capacity"] }) {
   );
 }
 
-function InvitationRow({ invitation }: { invitation: AdminInvitation }) {
+function RsvpRow({ rsvp }: { rsvp: AdminRsvp }) {
   return (
-    <tr data-status={invitation.status}>
-      <td>{invitation.wave}</td>
-      <td>{invitation.label}</td>
-      <td>{invitation.status === "sent" ? "Sent" : "Held"}</td>
+    <tr>
+      <td>{rsvp.createdAt.slice(0, 10)}</td>
       <td>
-        {invitation.guests.map((g) => (
-          <div key={g.id}>
-            {g.firstName} {g.lastName}
-            {g.plusOneOf !== null && " (guest)"}: {answerText(g.attending)}
-            {g.dietary && <span className="admin-muted"> · {g.dietary}</span>}
-            {g.inviteEmail && <div className="admin-muted">{g.inviteEmail}</div>}
+        {rsvp.people.map((p) => (
+          <div key={p.id}>
+            {p.firstName} {p.lastName}: {p.attending ? "Yes" : "No"}
+            {p.dietary && <span className="admin-muted"> · {p.dietary}</span>}
           </div>
         ))}
       </td>
-      <td>{invitation.email ?? ""}</td>
-      <td>{invitation.songRequest ?? ""}</td>
-      <td>{invitation.note ?? ""}</td>
+      <td>{rsvp.email}</td>
+      <td>{rsvp.songRequest ?? ""}</td>
+      <td>{rsvp.note ?? ""}</td>
     </tr>
   );
 }
@@ -169,32 +149,34 @@ export function Admin() {
       {summary === null && error === null && <p className="lede">Loading…</p>}
       {summary !== null && (
         <>
-          <CapacityTiles capacity={summary.capacity} />
+          <TotalTiles totals={summary.totals} />
           <div className="actions">
-            <button className="button" type="button" onClick={() => download(summary.invitations)}>
+            <button className="button" type="button" onClick={() => download(summary.rsvps)}>
               Download CSV
             </button>
           </div>
-          <div className="admin-table-wrap">
-            <table className="admin-table">
-              <thead>
-                <tr>
-                  <th>Wave</th>
-                  <th>Invitation</th>
-                  <th>Status</th>
-                  <th>Guests</th>
-                  <th>RSVP email</th>
-                  <th>Song</th>
-                  <th>Note</th>
-                </tr>
-              </thead>
-              <tbody>
-                {summary.invitations.map((invitation) => (
-                  <InvitationRow key={invitation.id} invitation={invitation} />
-                ))}
-              </tbody>
-            </table>
-          </div>
+          {summary.rsvps.length === 0 ? (
+            <p className="admin-muted">No RSVPs yet.</p>
+          ) : (
+            <div className="admin-table-wrap">
+              <table className="admin-table">
+                <thead>
+                  <tr>
+                    <th>Date</th>
+                    <th>People</th>
+                    <th>Email</th>
+                    <th>Song</th>
+                    <th>Note</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {summary.rsvps.map((rsvp) => (
+                    <RsvpRow key={rsvp.id} rsvp={rsvp} />
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
           <GiftsTable gifts={summary.gifts} />
         </>
       )}

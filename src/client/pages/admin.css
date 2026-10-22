@@ -55,10 +55,6 @@
   white-space: nowrap;
 }
 
-.admin-table tr[data-status="held"] {
-  opacity: 0.6;
-}
-
 .admin-gifts {
   margin-top: 2.5rem;
 }

@@ -1,102 +1,9 @@
 import type {
   AdminContribution,
-  AdminInvitation,
-  InvitationView,
+  AdminRsvp,
+  ParsedRsvpSubmission,
   RegistryItem,
 } from "@shared/schemas.ts";
-
-interface InvitationRow {
-  id: string;
-  label: string;
-  wave: number;
-  priority: number;
-  status: "held" | "sent";
-  sent_at: string | null;
-  email: string | null;
-  note: string | null;
-  song_request: string | null;
-  responded_at: string | null;
-  respond_by: string | null;
-}
-
-export interface GuestRow {
-  id: string;
-  invitation_id: string;
-  first_name: string;
-  last_name: string;
-  name_key: string;
-  plus_one_allowed: 0 | 1;
-  plus_one_of: string | null;
-  attending: 0 | 1 | null;
-  dietary: string | null;
-  /** Invitation address from the guest list. Admin only; never returned to the RSVP page. */
-  email: string | null;
-}
-
-const INVITATION_COLUMNS = `i.id, i.label, i.wave, i.priority, i.status, i.sent_at, i.email, i.note,
-  i.song_request, i.responded_at, w.respond_by`;
-
-const toBool = (v: 0 | 1 | null): boolean | null => (v === null ? null : v === 1);
-
-/** A wave's deadline is the end of `respond_by` anywhere on Earth (UTC−12). */
-export function isClosed(respondBy: string | null, now: Date): boolean {
-  if (respondBy === null) return false;
-  return now.getTime() > Date.parse(`${respondBy}T23:59:59-12:00`);
-}
-
-export async function sentNameCandidates(db: D1Database) {
-  const { results } = await db
-    .prepare(
-      `SELECT g.id AS guestId, g.invitation_id AS invitationId, g.name_key AS nameKey
-       FROM guests g JOIN invitations i ON i.id = g.invitation_id
-       WHERE i.status = 'sent' AND g.plus_one_of IS NULL`,
-    )
-    .all<{ guestId: string; invitationId: string; nameKey: string }>();
-  return results;
-}
-
-export async function getSentInvitation(db: D1Database, id: string) {
-  return db
-    .prepare(
-      `SELECT ${INVITATION_COLUMNS} FROM invitations i JOIN waves w ON w.wave = i.wave
-       WHERE i.id = ? AND i.status = 'sent'`,
-    )
-    .bind(id)
-    .first<InvitationRow>();
-}
-
-export async function getGuests(db: D1Database, invitationId: string) {
-  const { results } = await db
-    .prepare("SELECT * FROM guests WHERE invitation_id = ? ORDER BY sort, rowid")
-    .bind(invitationId)
-    .all<GuestRow>();
-  return results;
-}
-
-export async function getInvitationView(
-  db: D1Database,
-  id: string,
-  now: Date,
-): Promise<InvitationView | null> {
-  const invitation = await getSentInvitation(db, id);
-  if (invitation === null) return null;
-  const guests = await getGuests(db, id);
-  return {
-    id: invitation.id,
-    label: invitation.label,
-    respondBy: invitation.respond_by,
-    closed: isClosed(invitation.respond_by, now),
-    responded: invitation.responded_at !== null,
-    guests: guests.map((g) => ({
-      id: g.id,
-      firstName: g.first_name,
-      lastName: g.last_name,
-      plusOneAllowed: g.plus_one_allowed === 1,
-      isPlusOne: g.plus_one_of !== null,
-      attending: toBool(g.attending),
-    })),
-  };
-}
 
 export async function getSetting(db: D1Database, key: string): Promise<string | null> {
   const row = await db
@@ -106,37 +13,74 @@ export async function getSetting(db: D1Database, key: string): Promise<string | 
   return row?.value ?? null;
 }
 
-export async function listAdminInvitations(db: D1Database): Promise<AdminInvitation[]> {
-  const [invitations, guests] = await Promise.all([
+/** Saves one RSVP form and everyone on it in a single batch. */
+export async function insertRsvp(
+  db: D1Database,
+  body: ParsedRsvpSubmission,
+  now: string,
+): Promise<void> {
+  const rsvpId = crypto.randomUUID();
+  await db.batch([
     db
       .prepare(
-        `SELECT ${INVITATION_COLUMNS} FROM invitations i JOIN waves w ON w.wave = i.wave
-         ORDER BY i.wave, i.priority`,
+        "INSERT INTO rsvps (id, email, song_request, note, created_at) VALUES (?, ?, ?, ?, ?)",
       )
-      .all<InvitationRow>(),
-    db.prepare("SELECT * FROM guests ORDER BY sort, rowid").all<GuestRow>(),
+      .bind(rsvpId, body.email, body.songRequest, body.note, now),
+    ...body.people.map((p, sort) =>
+      db
+        .prepare(
+          `INSERT INTO rsvp_people (id, rsvp_id, first_name, last_name, attending, dietary, sort)
+           VALUES (?, ?, ?, ?, ?, ?, ?)`,
+        )
+        .bind(
+          crypto.randomUUID(),
+          rsvpId,
+          p.firstName,
+          p.lastName,
+          p.attending ? 1 : 0,
+          p.attending ? p.dietary : null,
+          sort,
+        ),
+    ),
   ]);
-  const byInvitation = Map.groupBy(guests.results, (g) => g.invitation_id);
-  return invitations.results.map((i) => ({
-    id: i.id,
-    label: i.label,
-    wave: i.wave,
-    priority: i.priority,
-    status: i.status,
-    sentAt: i.sent_at,
-    respondedAt: i.responded_at,
-    email: i.email,
-    note: i.note,
-    songRequest: i.song_request,
-    guests: (byInvitation.get(i.id) ?? []).map((g) => ({
-      id: g.id,
-      firstName: g.first_name,
-      lastName: g.last_name,
-      plusOneAllowed: g.plus_one_allowed === 1,
-      plusOneOf: g.plus_one_of,
-      attending: toBool(g.attending),
-      dietary: g.dietary,
-      inviteEmail: g.email,
+}
+
+interface RsvpRow {
+  id: string;
+  email: string;
+  song_request: string | null;
+  note: string | null;
+  created_at: string;
+}
+
+interface PersonRow {
+  id: string;
+  rsvp_id: string;
+  first_name: string;
+  last_name: string;
+  attending: 0 | 1;
+  dietary: string | null;
+}
+
+/** Every RSVP, newest first, with the people on it in the order they were entered. */
+export async function listAdminRsvps(db: D1Database): Promise<AdminRsvp[]> {
+  const [rsvps, people] = await Promise.all([
+    db.prepare("SELECT * FROM rsvps ORDER BY created_at DESC, rowid DESC").all<RsvpRow>(),
+    db.prepare("SELECT * FROM rsvp_people ORDER BY sort").all<PersonRow>(),
+  ]);
+  const byRsvp = Map.groupBy(people.results, (p) => p.rsvp_id);
+  return rsvps.results.map((r) => ({
+    id: r.id,
+    createdAt: r.created_at,
+    email: r.email,
+    songRequest: r.song_request,
+    note: r.note,
+    people: (byRsvp.get(r.id) ?? []).map((p) => ({
+      id: p.id,
+      firstName: p.first_name,
+      lastName: p.last_name,
+      attending: p.attending === 1,
+      dietary: p.dietary,
     })),
   }));
 }

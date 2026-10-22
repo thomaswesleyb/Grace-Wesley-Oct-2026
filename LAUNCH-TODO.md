@@ -13,8 +13,54 @@ Launch: **Friday, October 23, 2026**. Work top to bottom. Each step has:
   command with a `!` in front (e.g. `! pnpm exec wrangler secret put STRIPE_SECRET_KEY`). It runs
   in the terminal and asks for the value without the chat ever seeing it.
 - Claude doesn't commit. You commit whenever you like, at minimum where a step says so.
-- Keep the guest list outside the repo, or name it `guests….csv` (gitignored and blocked by the
-  commit hook).
+- Keep any guest list you make for yourselves outside the repo, or name it `guests….csv`
+  (gitignored and blocked by the commit hook). The site doesn't use one.
+
+---
+
+## Where things stand and the schedule to launch (as of Wed, Oct 21)
+
+**Done:** step 1 (committed and pushed), step 4 (32 photos in the gallery, built from `images/`; the
+web copies carry no location data). The RSVP page now uses a shared code instead of a guest list
+(built Oct 21, not yet committed), so there's no guest list to load.
+
+**Not started:** Wrangler isn't logged in, so there's no production database or domain yet.
+Alerts, Access, the RSVP code secret and the deploy are still to do. Only 4 of 18 Q&A answers
+show.
+
+**Required for launch:** steps 6, 10 and 11. Without them there's no site, or every RSVP is
+refused. Step 8 is needed to *see* RSVPs in admin. Step 7 matters more now: the alert email is
+how you hear about each RSVP, though every one is also saved in admin. Step 3 can follow launch,
+since hidden Q&A answers simply don't show.
+
+**Decide now:** the GitHub repo `thomaswesleyb/Grace-Wesley-Oct-2026` is **public**. Anyone can
+read `DETAILS.md`, the design files and the photo originals. The RSVP code isn't in the repo.
+To make the repo private: GitHub → Settings → Danger Zone → Change visibility.
+
+### Wed, Oct 21 (today): start the steps that have to wait on someone else
+
+Resend's DNS check and the Zero Trust signup can take hours, so start them first.
+
+1. Step 1, second half: install prek and run `prek install`.
+2. Step 2: confirm the domain is Active, and turn on auto-renew.
+3. Step 6: `! pnpm exec wrangler login`, then send the step 6 prompt.
+4. Step 7: create the Resend account and add the DNS records. Come back to it once it's verified.
+5. Step 8: set up Zero Trust and the Access app, then send the step 8 prompt.
+6. Step 9: decide whether the Registry link shows.
+7. Step 5: decide how guests will get the RSVP code. The printed invitation doesn't show it.
+
+### Thu, Oct 22: content, deploy, rehearsal
+
+1. Step 3: fill in `DETAILS.md`, at least the reception venue, address and time, plus the dress
+   code.
+2. Step 7: once Resend says verified, set the key and send the step 7 prompt.
+3. Step 10: deploy, then check the site on your phone and confirm admin turns away a stranger.
+4. Step 11: set the RSVP code in production.
+5. Step 12: send a test RSVP, delete it, then commit and push.
+
+### Fri, Oct 23: launch
+
+Step 13: send the invitations with the code, and watch `/admin` and your email.
 
 ---
 
@@ -31,7 +77,7 @@ files. It reads the same `.pre-commit-config.yaml` format as the older `pre-comm
 laptop doesn't mean a lost website. prek stops a broken change or a guest list from being
 committed by accident.
 
-- [ ] Review the changes (`git status`), commit them on the `template` branch, and push.
+- [x] Review the changes (`git status`), commit them on the `template` branch, and push.
 - [ ] Install prek (see its README), then run `prek install` in the repo.
 
 > Prompt: *none, this one is yours.*
@@ -78,48 +124,43 @@ answers first.
 *ImageMagick* (already installed) makes small, fast-loading WebP copies of each photo for the
 site. Your originals are never changed.
 
-**Why:** the page says "Photos coming soon" until there are photos. Captions and alt text come
-only from you. Alt text is a short description of each photo that screen readers read aloud
-to guests who can't see it.
+**Why:** the page says "Photos coming soon" until there are photos. Every photo in `images/`
+is shown automatically, and `pnpm dev` and `pnpm build` refresh the gallery. Captions and alt
+text come only from you. Alt text is a short description of each photo that screen readers read
+aloud to guests who can't see it. Photos you haven't described are read as "Photo 12 of 32".
 
-- [ ] Put the originals in `images/` (JPEG, PNG, WebP, or iPhone HEIC).
-- [ ] Add `images/captions.csv` with the columns `file,caption,alt`: one row per photo,
-      in the order you want them shown. `alt` is required and `caption` is optional. If a
-      photo has no row, or a row has no alt text, the build stops and names the photo.
-- [ ] Decide whether to commit the originals. The site only needs the generated copies in
-      `public/photos/gallery/` and `content/gallery.json`. The copies have location data
-      removed. The originals may still have it.
+- [x] Put the originals in `images/` (JPEG, PNG, WebP, or iPhone HEIC). 32 are in.
+- [ ] Optional: in `images/captions.csv` (columns `file,caption,alt`), add a row for any photo
+      you want to caption, describe, or move to the front. Listed photos come first, in the
+      CSV's order. The rest follow by file name.
+- [ ] Decide whether to commit the originals (307 MB for the 24 new ones). The site only needs
+      the generated copies in `public/photos/gallery/` (14 MB) and `content/gallery.json`. The
+      copies have location data removed. `IMG_7865.JPG`'s original still has GPS coordinates,
+      and the repo is public.
 - [ ] Optional: add `Photos intro: …` and `Labyrinth intro: …` to `DETAILS.md`.
 
 > Prompt: **"Photos are in. Build the gallery copies and show me the page."**
 
-### 5. Finish the guest list
+### 5. Decide how guests get the RSVP code
 
-**What it is:** a CSV (spreadsheet saved as comma-separated text) with one row per invited
-person. *Waves* are your invitation phases: wave 1 now, then waves 2 and 3 as seats open toward
-the 90-person target. *Priority* orders invitations within a wave.
+**What it is:** the RSVP form opens only after a guest enters the shared code (10232027). The
+site ignores dashes, slashes and spaces, so `10/23/2027` works too.
 
-**Why:** the RSVP page only accepts guests on this list. A guest types their name and gets
-their whole invitation (household, plus-one allowance). Guests in waves you haven't sent can't
-find themselves, which keeps the waves private. A checked list now avoids "I can't find my name"
-messages on launch day.
+**Why:** the printed invitation doesn't mention a code, so guests need another way to learn it.
+Without the code they reach a dead end, apart from the contact address shown on the page. The
+code is the wedding date, which keeps out bots and strangers but not anyone who has seen an
+invitation.
 
-- [ ] Build the CSV with these columns:
-      `invitation,first_name,last_name,plus_one_allowed,wave,priority,email`
-      - One row per person. People on the same invitation share an `invitation` value. A blank
-        `invitation` means a solo guest.
-      - `plus_one_allowed`: yes/no. `wave`: 1, 2 or 3. `priority`: optional, 1 = send first.
-        `email`: optional.
-      - Names exactly as on the envelope. Guests type their name to find their invitation.
-- [ ] Save it outside the repo (e.g. `~/wedding/guests.csv`).
+- [ ] Choose how to share it: an insert card, a text or email with the invitation, or word of
+      mouth.
+- [ ] Optional: pick a less guessable code. Changing it later takes one command (step 11).
 
-> Prompt: **"Check my guest list at ~/wedding/guests.csv for problems without loading it
-> anywhere: duplicate names, bad waves, bad emails, and the seat count per wave against 90."**
+> Prompt: *none.*
 
 ### 6. Connect Wrangler to Cloudflare
 
 **What it is:** *Wrangler* is Cloudflare's command-line tool for deploying and managing the site.
-*D1* is Cloudflare's database, which stores invitations, RSVPs and gifts. *Migrations* are the
+*D1* is Cloudflare's database, which stores RSVPs and gifts. *Migrations* are the
 SQL files in `migrations/` that create its tables. A *custom domain* tells Cloudflare to serve
 the site at your address instead of a `workers.dev` one.
 
@@ -140,18 +181,20 @@ the HTTPS certificate automatically.
 You prove it with DNS records Resend gives you. An *API key* is the password the site uses to
 send through Resend, stored as a Cloudflare *secret* (encrypted, never in the code).
 
-**Why:** the site emails you each time someone RSVPs or gives a gift. Later it will also email
-guests their edit links. Without a verified domain those emails land in spam or are refused.
+**Why:** the site emails you each time someone RSVPs (with everyone's answers) or gives a
+gift. Without a verified domain those emails land in spam or are refused. Every RSVP is also
+saved in admin, so a lost email doesn't lose the RSVP.
 
+- [x] Alerts go to `parkhill.bailey.wedding@gmail.com` from
+      `RSVP <rsvp@parkhillbaileywedding.com>` (set in `wrangler.jsonc` on Oct 21).
 - [ ] Create a free account at resend.com and add **parkhillbaileywedding.com** as a sending
       domain. Add the DNS records Resend lists in Cloudflare → DNS, then wait until Resend shows
       the domain as verified.
-- [ ] Create an API key, then run: `! pnpm exec wrangler secret put RESEND_API_KEY`
-- [ ] Decide which addresses get alerts and what the sender should be, e.g.
-      `RSVP <rsvp@parkhillbaileywedding.com>`.
+- [ ] Create an API key with "Sending access" for that domain only, then run:
+      `! pnpm exec wrangler secret put RESEND_API_KEY`
 
-> Prompt: **"Resend is verified and the key is set. Send alerts to <your emails> from
-> <sender>. Update the config."**
+> Prompt: **"Resend is verified and the key is set. Deploy, then send a test RSVP and check
+> that the alert arrives."**
 
 ### 8. Protect the admin page (Cloudflare Access)
 
@@ -160,7 +203,7 @@ of chosen pages. Visitors get a one-time code by email, and only the addresses y
 The *team domain* identifies your Access account. The *AUD tag* identifies this one protected
 app. The site checks both on every admin request.
 
-**Why:** `/admin` shows every guest's name, answers, dietary needs, emails and gifts. Until
+**Why:** `/admin` shows every RSVP's names, answers, dietary needs, emails, and gifts. Until
 Access is set up, the live admin page refuses to open at all. That's deliberate: it's locked
 rather than left exposed.
 
@@ -201,34 +244,32 @@ admin refuses a stranger, catches problems before any guest sees them.
 - [ ] Open https://parkhillbaileywedding.com/admin. It should ask for your email and send a
       code, and a different email should be refused.
 
-### 11. Load the guest list into production
+### 11. Set the RSVP code in production
 
-**What it is:** *seeding* copies the guest CSV into the live database. Marking wave 1 *sent*
-makes those guests findable on the RSVP page.
+**What it is:** the code is stored as a Cloudflare *secret* named `RSVP_CODE`: encrypted, and
+never in the code, the repo or the page guests download.
 
-**Why:** the live site starts with an empty guest list. Until this step every name gets "we
-couldn't find that name". Waves 2 and 3 stay hidden until you send their invitations.
+**Why:** until it's set, the RSVP page answers every code with "RSVPs aren't open yet." That's
+deliberate: a missing setting locks the form rather than leaving it open.
 
-> Prompt: **"Load ~/wedding/guests.csv into production and mark wave 1 as sent."**
-
-- [ ] Look up two or three real wave-1 names on the live RSVP page. They should be found.
-- [ ] Look up a wave-2 name. It should say it can't find the name.
+- [ ] Run: `! pnpm exec wrangler secret put RSVP_CODE` and type `10232027` (or your own code)
+      when asked. Run the same command again any time to change it. It takes effect at once,
+      with no deploy.
+- [ ] On the live RSVP page, a wrong code should be refused and the real one should open the
+      form.
 
 ### 12. Test a real RSVP end to end
 
-**What it is:** a *smoke test*: one real run through the live site using a throwaway "Test
-Guest" invitation.
+**What it is:** a *smoke test*: one real RSVP through the live site under the name "Test
+Guest".
 
-**Why:** it proves the whole chain works on the real setup: lookup, saving, the admin view, and
-the alert email. A test invitation keeps fake answers out of your real guest list, and deleting
-it afterwards keeps your counts accurate.
+**Why:** it proves the whole chain works on the real setup: the code, saving, the admin view,
+and the alert email. Deleting it afterwards keeps your counts accurate.
 
-> Prompt: **"Add a temporary test invitation called 'Test Guest' to production so I can try an
-> RSVP. I'll tell you when I'm done."**
+- [ ] RSVP as "Test Guest" with the code. Check that the alert email arrives and the response
+      shows in admin.
 
-- [ ] RSVP as "Test Guest". Check that the alert email arrives and the response shows in admin.
-
-> Prompt: **"I'm done testing. Delete the Test Guest invitation and its RSVP from production."**
+> Prompt: **"I'm done testing. Delete the Test Guest RSVP from production."**
 
 - [ ] Commit and push everything.
 
@@ -238,32 +279,26 @@ it afterwards keeps your counts accurate.
 
 ### 13. Launch day
 
-**What it is:** sending the wave-1 invitations, which point guests to the site.
+**What it is:** sending the invitations, which point guests to the site, along with the RSVP
+code.
 
 **Why:** RSVPs start arriving immediately. Watching admin and the alert emails on day one means
 any problem shows up after a handful of guests, not after everyone.
 
-- [ ] Send the invitations.
+- [ ] Send the invitations, and the code the way you chose in step 5.
 - [ ] Watch `/admin` and the alert emails as the first RSVPs arrive.
 
 > Prompt (if anything looks wrong): **"A guest says <what happened>. Find out why."**
 
-### 14. Build the deferred RSVP features
+### 14. Add the weekly backup
 
-**What it is:** three features held back to make the launch date:
+**What it is:** a *weekly CSV backup* keeps a copy of the RSVPs beyond the database's 7-day
+undo window. It was held back to make the launch date.
 
-- *Email-link edits* let a guest change their RSVP through a private link sent to their email.
-- *Mark sent* and *next-to-send* suggestions in admin are how you release waves 2 and 3.
-- A *weekly CSV backup* keeps a copy of the RSVPs beyond the database's 7-day undo window.
+**Why:** the alert emails already give you a copy of each RSVP. The backup covers the case
+where an email was missed and the database is damaged.
 
-**Why:** at launch, a guest who needs to change their answer has to contact you, and releasing
-a wave needs Claude's help. These make both self-service before the first deadline.
-
-> Prompt: **"Build the week-1 features from the plan: email-link RSVP edits (with the
-> declined-to-accepted open-seat check), Mark sent and next-to-send suggestions in admin, and the
-> weekly CSV backup."**
-
-- [ ] Try editing your test RSVP through the emailed link, then deploy.
+> Prompt: **"Build the weekly CSV backup of RSVPs."**
 
 ---
 
@@ -341,30 +376,29 @@ real $10 test proves the live setup end to end before guests use it.
 
 ## Part 4: Until the wedding (through Oct 2027)
 
-### 19. Run the waves
+### 19. Invite later groups
 
-**What it is:** after each wave's RSVP deadline, the admin page shows how many of the 90 seats
-are open. Unanswered invitations count as taken, so you never overbook. Admin then suggests
-which held invitations fit next, in priority order.
+**What it is:** the site no longer tracks waves or seats. You decide who to invite next from
+the Attending and Declining totals in `/admin`, and send them the same code.
 
-**Why:** it's how declines in one wave turn into invitations for the next, while every guest
-only ever sees their own invitation and deadline.
+**Why:** the site doesn't show a deadline, so the date you give each group is what they go by.
+Your own dates are in `DETAILS.md` (Mar 30, Jun 30, Aug 30, 2027).
 
-- [ ] After each deadline (Mar 30, Jun 30, Aug 30, 2027), check open seats in `/admin`.
-- [ ] Send the next invitations from the suggested list, then click **Mark sent** for each.
+- [ ] After each of your deadlines, check the totals in `/admin` against your seat target.
+- [ ] Send the next invitations along with the code.
+- [ ] Watch for a household that RSVPs twice. Admin lists both, so delete the extra one.
 
-> Prompt (if you change the plan): **"Move wave 2's deadline to <date>"** or **"Change the
-> seat target to <number>."**
+> Prompt (when you're done taking RSVPs): **"Close RSVPs in production."**
 
 ### 20. Final numbers
 
-**What it is:** the RSVP export from admin: one row per guest, with attendance, plus-ones,
-dietary needs and notes.
+**What it is:** the RSVP export from admin: one row per person, with attendance, dietary needs
+and notes. Rows from the same form share an `rsvp_id`.
 
-**Why:** the caterer, venue and seating chart need final headcounts and dietary needs, and
-you'll want to follow up with anyone who never replied.
+**Why:** the caterer, venue and seating chart need final headcounts and dietary needs. The site
+has no guest list, so compare the export against your own list to find anyone who never replied.
 
-- [ ] After the last deadline, download the RSVP CSV from `/admin`.
+- [ ] After your last deadline, download the RSVP CSV from `/admin`.
 
-> Prompt: **"Give me final counts: attending, plus-ones, dietary needs, and anyone who never
-> replied."**
+> Prompt: **"Here's the RSVP export and my guest list (outside the repo). Give me final counts,
+> dietary needs, possible duplicate RSVPs, and anyone on my list who never replied."**

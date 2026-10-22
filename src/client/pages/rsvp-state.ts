@@ -1,86 +1,70 @@
-import type { InvitationView, RsvpSubmission } from "@shared/schemas.ts";
+import { MAX_PARTY, type RsvpSubmission } from "@shared/schemas.ts";
 
-export interface GuestAnswer {
+export interface PersonDraft {
+  /** Stable React key, so removing a person doesn't shift the others' inputs. */
+  key: number;
+  firstName: string;
+  lastName: string;
   attending: boolean | null;
   dietary: string;
 }
 
-export interface PlusOneDraft {
-  bringing: boolean;
-  firstName: string;
-  lastName: string;
-  dietary: string;
-}
-
 export interface Draft {
-  answers: Record<string, GuestAnswer>;
-  plusOnes: Record<string, PlusOneDraft>;
+  people: PersonDraft[];
   email: string;
   songRequest: string;
   note: string;
 }
 
-export function emptyDraft(invitation: InvitationView): Draft {
-  const answers: Record<string, GuestAnswer> = {};
-  const plusOnes: Record<string, PlusOneDraft> = {};
-  for (const guest of invitation.guests) {
-    if (guest.isPlusOne) continue;
-    answers[guest.id] = { attending: null, dietary: "" };
-    if (guest.plusOneAllowed)
-      plusOnes[guest.id] = { bringing: false, firstName: "", lastName: "", dietary: "" };
-  }
-  return { answers, plusOnes, email: "", songRequest: "", note: "" };
+let nextKey = 0;
+
+function emptyPerson(): PersonDraft {
+  nextKey += 1;
+  return { key: nextKey, firstName: "", lastName: "", attending: null, dietary: "" };
 }
 
-/** The plus-one that will actually be submitted: host attending, box ticked, name filled. */
-export function activePlusOne(draft: Draft): { hostId: string; plusOne: PlusOneDraft } | null {
-  for (const [hostId, plusOne] of Object.entries(draft.plusOnes)) {
-    if (plusOne.bringing && draft.answers[hostId]?.attending === true) return { hostId, plusOne };
-  }
-  return null;
+export function emptyDraft(): Draft {
+  return { people: [emptyPerson()], email: "", songRequest: "", note: "" };
 }
 
-/** Returns what still needs answering on the respond step, or null when it's complete. */
+export const canAddPerson = (draft: Draft) => draft.people.length < MAX_PARTY;
+
+export function addPerson(draft: Draft): Draft {
+  return canAddPerson(draft) ? { ...draft, people: [...draft.people, emptyPerson()] } : draft;
+}
+
+/** Removes the person with this key. The first person (the one responding) always stays. */
+export function removePerson(draft: Draft, key: number): Draft {
+  const people = draft.people.filter((p, index) => index === 0 || p.key !== key);
+  return { ...draft, people };
+}
+
+export function updatePerson(draft: Draft, key: number, patch: Partial<PersonDraft>): Draft {
+  return { ...draft, people: draft.people.map((p) => (p.key === key ? { ...p, ...patch } : p)) };
+}
+
+/** Returns what still needs filling in on the respond step, or null when it's complete. */
 export function respondProblem(draft: Draft): string | null {
-  if (Object.values(draft.answers).some((a) => a.attending === null)) {
+  if (draft.people.some((p) => !p.firstName.trim() || !p.lastName.trim())) {
+    return "Please add a first and last name for each person.";
+  }
+  if (draft.people.some((p) => p.attending === null)) {
     return "Please let us know for each person whether they'll attend.";
   }
-  const active = activePlusOne(draft);
-  if (active !== null && (!active.plusOne.firstName.trim() || !active.plusOne.lastName.trim())) {
-    return "Please add your guest's first and last name.";
-  }
   return null;
 }
 
-export function toSubmission(draft: Draft): RsvpSubmission {
-  const active = activePlusOne(draft);
+export function toSubmission(code: string, draft: Draft): RsvpSubmission {
   return {
-    guests: Object.entries(draft.answers).map(([id, answer]) => ({
-      id,
-      attending: answer.attending === true,
-      dietary: answer.attending === true ? answer.dietary : "",
+    code,
+    people: draft.people.map((p) => ({
+      firstName: p.firstName,
+      lastName: p.lastName,
+      attending: p.attending === true,
+      dietary: p.attending === true ? p.dietary : "",
     })),
-    plusOne:
-      active === null
-        ? null
-        : {
-            hostId: active.hostId,
-            firstName: active.plusOne.firstName,
-            lastName: active.plusOne.lastName,
-            dietary: active.plusOne.dietary,
-          },
     email: draft.email.trim(),
     songRequest: draft.songRequest,
     note: draft.note,
   };
-}
-
-/** "2027-03-01" → "March 1, 2027". */
-export function formatDate(isoDate: string): string {
-  return new Date(`${isoDate}T12:00:00Z`).toLocaleDateString("en-US", {
-    timeZone: "UTC",
-    month: "long",
-    day: "numeric",
-    year: "numeric",
-  });
 }

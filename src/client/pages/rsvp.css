@@ -80,26 +80,10 @@
   background: rgb(239 230 214 / 0.07);
 }
 
-.rsvp-choice input,
-.rsvp-check input {
+.rsvp-choice input {
   accent-color: var(--sepia-300);
   width: 1.1rem;
   height: 1.1rem;
-}
-
-.rsvp-plus-one {
-  margin: 0 0 1rem;
-  padding-top: 0.75rem;
-  border-top: 1px dashed rgb(168 139 106 / 0.3);
-}
-
-.rsvp-check {
-  display: flex;
-  align-items: center;
-  gap: 0.6rem;
-  min-height: 2.75rem;
-  margin-bottom: 0.5rem;
-  cursor: pointer;
 }
 
 .rsvp-review {

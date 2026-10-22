@@ -1,5 +1,5 @@
 import { cleanRetailerLink } from "@shared/registry.ts";
-import { parseCsv } from "./guests.ts";
+import { parseCsv } from "./csv.ts";
 
 export const REGISTRY_COLUMNS = ["item", "price", "link"] as const;
 /** Optional: `image` is a path under public/ (e.g. "registry/espresso.webp"). */

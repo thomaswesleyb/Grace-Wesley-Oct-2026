@@ -65,13 +65,7 @@ RSVP button label: {{ RSVP_BUTTON_LABEL }}   <!-- e.g. "I'LL BE THERE!" -->
 ## Wedding — scheduling
 
 Wedding time zone: {{ WEDDING_TIME_ZONE }}   <!-- IANA name, e.g. "America/Chicago" -->
-Couple contact: {{ COUPLE_CONTACT }}   <!-- shown when a guest can't find their invitation -->
-
-## RSVP — waves
-
-RSVP deadline, wave 1: {{ WAVE_1_DEADLINE }}   <!-- e.g. "March 1, 2027" -->
-RSVP deadline, wave 2: {{ WAVE_2_DEADLINE }}
-RSVP deadline, wave 3: {{ WAVE_3_DEADLINE }}
+Couple contact: {{ COUPLE_CONTACT }}   <!-- shown on the RSVP page for guests without the code -->
 
 ## Photos and Labyrinth
 

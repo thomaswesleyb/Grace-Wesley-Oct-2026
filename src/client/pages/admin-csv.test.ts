@@ -2,48 +2,32 @@ import { describe, expect, it } from "vitest";
 import { toCsv } from "@client/pages/Admin.tsx";
 
 describe("toCsv", () => {
-  it("writes one row per guest, names the plus-one's host, and escapes cells", () => {
+  it("writes one row per person and escapes cells", () => {
     const csv = toCsv([
       {
-        id: "i",
-        label: "Lee, Sam",
-        wave: 1,
-        priority: 1,
-        status: "sent",
-        sentAt: null,
-        respondedAt: "2026-10-24",
+        id: "r1",
+        createdAt: "2026-10-24T10:00:00Z",
         email: "sam@example.com",
-        note: 'He said "yes"',
         songRequest: null,
-        guests: [
-          {
-            id: "a",
-            firstName: "Sam",
-            lastName: "Lee",
-            plusOneAllowed: true,
-            plusOneOf: null,
-            attending: true,
-            dietary: null,
-            inviteEmail: "sam.lee@example.com",
-          },
-          {
-            id: "p",
-            firstName: "Pat",
-            lastName: "Doe",
-            plusOneAllowed: false,
-            plusOneOf: "a",
-            attending: true,
-            dietary: "vegan",
-            inviteEmail: null,
-          },
+        note: 'He said "yes", twice',
+        people: [
+          { id: "p1", firstName: "Sam", lastName: "Lee", attending: true, dietary: null },
+          { id: "p2", firstName: "Pat", lastName: "Doe", attending: false, dietary: null },
         ],
       },
     ]);
     const lines = csv.split("\n");
     expect(lines).toHaveLength(3);
-    expect(lines[1]).toBe(
-      '"Lee, Sam",1,sent,Sam,Lee,,Yes,,sam.lee@example.com,sam@example.com,,"He said ""yes""",2026-10-24',
+    expect(lines[0]).toBe(
+      "rsvp_id,first_name,last_name,attending,dietary,email,song_request,note,submitted_at",
     );
-    expect(lines[2]).toContain("Pat,Doe,Sam Lee,Yes,vegan,,sam@example.com");
+    expect(lines[1]).toBe(
+      'r1,Sam,Lee,Yes,,sam@example.com,,"He said ""yes"", twice",2026-10-24T10:00:00Z',
+    );
+    expect(lines[2]).toContain("r1,Pat,Doe,No,");
+  });
+
+  it("writes only the header when there are no RSVPs", () => {
+    expect(toCsv([]).split("\n")).toHaveLength(1);
   });
 });

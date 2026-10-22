@@ -1,5 +1,6 @@
 import { beforeEach, describe, expect, it } from "vitest";
-import { answerAll, call, resetDb, seed } from "@worker/test-helpers.ts";
+import { adminSummary } from "@shared/schemas.ts";
+import { call, resetDb, rsvpBody } from "@worker/test-helpers.ts";
 
 beforeEach(resetDb);
 
@@ -29,36 +30,30 @@ describe("GET /api/admin/summary", () => {
     expect(response.status).toBe(503);
   });
 
-  it("summarizes capacity across sent invitations only", async () => {
-    const yes = await seed({
-      label: "Yes",
-      guests: [{ first: "Will", last: "Come", plusOne: true, email: "will@example.com" }],
+  it("lists every RSVP with its people and totals", async () => {
+    await call("/api/rsvp", {
+      body: rsvpBody({
+        email: "lee@example.com",
+        people: [
+          { firstName: "Sam", lastName: "Lee", attending: true, dietary: "vegan" },
+          { firstName: "Kim", lastName: "Lee", attending: false },
+        ],
+      }),
     });
-    await seed({ label: "Pending", guests: [{ first: "Maybe", last: "Later", plusOne: true }] });
-    await seed({ label: "Held", status: "held", guests: [{ first: "Not", last: "Sent" }] });
-    await call(`/api/rsvp/${yes.invitationId}`, { body: answerAll(yes.guestIds, true) });
+    await call("/api/rsvp", { body: rsvpBody({ email: "doe@example.com" }) });
 
     const response = await call("/api/admin/summary", {
       origin: "http://localhost:5173",
       env: { ADMIN_DEV_BYPASS: "1" },
     });
     expect(response.status).toBe(200);
-    const body = await response.json<{
-      capacity: Record<string, number>;
-      invitations: { label: string; guests: { inviteEmail: string | null }[] }[];
-      gifts: unknown[];
-    }>();
-    expect(body.capacity).toEqual({
-      target: 90,
-      confirmed: 1,
-      declined: 0,
-      pending: 2,
-      open: 87,
-      forecast: 3,
-    });
-    expect(body.invitations).toHaveLength(3);
+    const body = adminSummary.parse(await response.json());
+    expect(body.totals).toEqual({ rsvps: 2, attending: 2, declining: 1 });
     expect(body.gifts).toEqual([]);
-    const yesGuests = body.invitations.find((i) => i.label === "Yes")?.guests;
-    expect(yesGuests?.[0]?.inviteEmail).toBe("will@example.com");
+    const lee = body.rsvps.find((r) => r.email === "lee@example.com");
+    expect(lee?.people).toMatchObject([
+      { firstName: "Sam", lastName: "Lee", attending: true, dietary: "vegan" },
+      { firstName: "Kim", lastName: "Lee", attending: false, dietary: null },
+    ]);
   });
 });

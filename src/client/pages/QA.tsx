@@ -1,5 +1,4 @@
 import type { Topic } from "@content/qa.ts";
-import { Backdrop } from "@client/components/Backdrop.tsx";
 import { site } from "@client/site.ts";
 import "@client/pages/qa.css";
 
@@ -13,7 +12,6 @@ export function QA() {
 
   return (
     <>
-      <Backdrop src="/photos/natural-bridge.webp" position="center 40%" />
       <section className="page">
         <h1>Important Information</h1>
         <p className="lede">More answers will appear here as plans come together.</p>

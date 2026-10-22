@@ -39,8 +39,7 @@ read event details and RSVP.
 
 Ask the user for these before building the pages that need them: reception venue, address and
 time; the ceremony's street address; dress code; registry intro and URL; travel and lodging
-(B&B, cabin, hotel); the wedding time zone; a contact for guests; and the RSVP deadline for each
-wave.
+(B&B, cabin, hotel).
 
 ## Design direction
 
@@ -66,16 +65,17 @@ The approved plan: one Cloudflare Worker (free tier) serves the Vite + React + R
 app and a Hono API, with data in D1. `/admin` sits behind Cloudflare Access. Payments (phase 2)
 use Stripe Checkout. See `README.md` for commands and the one-time deploy steps.
 
-- `src/client/` pages and components; `src/worker/` API; `src/shared/` zod schemas, name
-  matching and capacity math shared by both; `scripts/` content generation and guest seeding;
-  `content/qa.ts` Q&A definitions; `migrations/` D1 SQL.
+- `src/client/` pages and components; `src/worker/` API; `src/shared/` zod schemas and registry
+  math shared by both; `scripts/` content, gallery and registry generation; `content/qa.ts` Q&A
+  definitions; `migrations/` D1 SQL.
 - Site content comes only from `DETAILS.md` via `pnpm gen` → `content/details.json`
   (gitignored). Don't put wedding facts in components.
 - Keep the backend minimal. Add server code only for things the frontend can't do on its own.
 - Follow the global Node/TypeScript standards: Node 22 LTS, ESM, strict `tsconfig`, `oxlint`,
   `oxfmt`, `vitest`, pinned dependency versions, and `prek` hooks. `pnpm check` runs them all.
-- RSVP waves: guests in unsent waves must get the same "not found" reply as strangers, and the
-  wave must never reach the browser. Tests in `src/worker/rsvp.test.ts` guard this.
+- RSVP code: guests unlock the form with the shared `RSVP_CODE` secret. The code must never
+  reach the browser bundle, `DETAILS.md` or the repo, and the server checks it on every submit,
+  not just on unlock. Tests in `src/worker/rsvp.test.ts` guard this.
 
 ## Working conventions
 

@@ -1,7 +1,12 @@
-import { NavLink, Outlet } from "react-router";
+import { NavLink, Outlet, useLocation } from "react-router";
+import { RandomBackdrop } from "@client/components/Backdrop.tsx";
 import { site } from "@client/site.ts";
 
+/** Home has its own fixed backdrop; admin is a plain working page. */
+const OWN_BACKDROP = new Set(["/", "/admin"]);
+
 export function Layout() {
+  const { pathname } = useLocation();
   return (
     <>
       <header className="nav">
@@ -31,13 +36,11 @@ export function Layout() {
             <li>
               <NavLink to="/labyrinth">Labyrinth</NavLink>
             </li>
-            <li>
-              <NavLink to="/registry">Registry</NavLink>
-            </li>
           </ul>
         </nav>
       </header>
       <main>
+        {!OWN_BACKDROP.has(pathname) && <RandomBackdrop key={pathname} />}
         <Outlet />
       </main>
     </>

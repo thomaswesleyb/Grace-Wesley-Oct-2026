@@ -1,71 +1,29 @@
 import { createExecutionContext, waitOnExecutionContext } from "cloudflare:test";
 import { env } from "cloudflare:workers";
-import { nameKey } from "@shared/names.ts";
 import app from "@worker/index.ts";
 import type { Env } from "@worker/env.ts";
 
-export interface SeedGuest {
-  first: string;
-  last: string;
-  plusOne?: boolean;
-  email?: string;
-}
-
-export interface SeedSpec {
-  label: string;
-  wave?: number;
-  status?: "held" | "sent";
-  guests: SeedGuest[];
-}
-
-export interface Seeded {
-  invitationId: string;
-  guestIds: string[];
-}
+/** Matches the RSVP_CODE binding in vitest.config.ts. */
+export const CODE = "10232027";
 
 export async function resetDb(): Promise<void> {
   await env.DB.batch([
     env.DB.prepare("DELETE FROM contributions"),
     env.DB.prepare("DELETE FROM registry_items"),
-    env.DB.prepare("DELETE FROM rsvp_events"),
-    env.DB.prepare("DELETE FROM guests"),
-    env.DB.prepare("DELETE FROM invitations"),
-    env.DB.prepare("UPDATE waves SET respond_by = NULL"),
+    env.DB.prepare("DELETE FROM rsvp_people"),
+    env.DB.prepare("DELETE FROM rsvps"),
     env.DB.prepare("UPDATE settings SET value = '1' WHERE key = 'rsvp_open'"),
   ]);
 }
 
-export async function seed(spec: SeedSpec): Promise<Seeded> {
-  const invitationId = crypto.randomUUID();
-  const guestIds = spec.guests.map(() => crypto.randomUUID());
-  const status = spec.status ?? "sent";
-  await env.DB.batch([
-    env.DB.prepare(
-      "INSERT INTO invitations (id, label, wave, priority, status, sent_at) VALUES (?, ?, ?, 1, ?, ?)",
-    ).bind(
-      invitationId,
-      spec.label,
-      spec.wave ?? 1,
-      status,
-      status === "sent" ? "2026-10-23T00:00:00Z" : null,
-    ),
-    ...spec.guests.map((g, i) =>
-      env.DB.prepare(
-        `INSERT INTO guests (id, invitation_id, first_name, last_name, name_key, plus_one_allowed, email, sort)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
-      ).bind(
-        guestIds[i]!,
-        invitationId,
-        g.first,
-        g.last,
-        nameKey(g.first, g.last),
-        g.plusOne ? 1 : 0,
-        g.email ?? null,
-        i,
-      ),
-    ),
-  ]);
-  return { invitationId, guestIds };
+/** A valid RSVP from one attending guest; spread overrides on top. */
+export function rsvpBody(overrides: Record<string, unknown> = {}) {
+  return {
+    code: CODE,
+    people: [{ firstName: "Sam", lastName: "Lee", attending: true, dietary: "" }],
+    email: "guest@example.com",
+    ...overrides,
+  };
 }
 
 let ipCounter = 0;
@@ -100,13 +58,6 @@ export async function call(
   );
   await waitOnExecutionContext(ctx);
   return response;
-}
-
-export function answerAll(guestIds: string[], attending: boolean) {
-  return {
-    guests: guestIds.map((id) => ({ id, attending, dietary: "" })),
-    email: "guest@example.com",
-  };
 }
 
 export async function seedItem(
