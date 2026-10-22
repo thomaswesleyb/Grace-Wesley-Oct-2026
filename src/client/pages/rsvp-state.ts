@@ -1,4 +1,4 @@
-import { MAX_PARTY, type RsvpSubmission } from "@shared/schemas.ts";
+import type { ListedGuest, RsvpSubmission } from "@shared/schemas.ts";
 
 export interface PersonDraft {
   /** Stable React key, so removing a person doesn't shift the others' inputs. */
@@ -18,19 +18,27 @@ export interface Draft {
 
 let nextKey = 0;
 
-function emptyPerson(): PersonDraft {
+function emptyPerson(firstName = "", lastName = ""): PersonDraft {
   nextKey += 1;
-  return { key: nextKey, firstName: "", lastName: "", attending: null, dietary: "" };
+  return { key: nextKey, firstName, lastName, attending: null, dietary: "" };
 }
 
-export function emptyDraft(): Draft {
-  return { people: [emptyPerson()], email: "", songRequest: "", note: "" };
+/** A new RSVP for this guest: just them, under their name from the guest list. */
+export function draftFor(guest: ListedGuest): Draft {
+  return {
+    people: [emptyPerson(guest.firstName, guest.lastName)],
+    email: "",
+    songRequest: "",
+    note: "",
+  };
 }
 
-export const canAddPerson = (draft: Draft) => draft.people.length < MAX_PARTY;
+export const canAddPerson = (draft: Draft, spots: number) => draft.people.length < spots;
 
-export function addPerson(draft: Draft): Draft {
-  return canAddPerson(draft) ? { ...draft, people: [...draft.people, emptyPerson()] } : draft;
+export function addPerson(draft: Draft, spots: number): Draft {
+  return canAddPerson(draft, spots)
+    ? { ...draft, people: [...draft.people, emptyPerson()] }
+    : draft;
 }
 
 /** Removes the person with this key. The first person (the one responding) always stays. */
@@ -54,9 +62,9 @@ export function respondProblem(draft: Draft): string | null {
   return null;
 }
 
-export function toSubmission(code: string, draft: Draft): RsvpSubmission {
+export function toSubmission(guestId: string, draft: Draft): RsvpSubmission {
   return {
-    code,
+    guestId,
     people: draft.people.map((p) => ({
       firstName: p.firstName,
       lastName: p.lastName,

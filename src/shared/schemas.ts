@@ -13,10 +13,30 @@ const optionalText = (max: number) =>
 /** Most people one RSVP form can answer for. */
 export const MAX_PARTY = 6;
 
-const rsvpCode = z.string().max(40);
-
-export const unlockRequest = z.object({ code: rsvpCode });
 export const okResponse = z.object({ ok: z.literal(true) });
+
+export const lookupRequest = z.object({ firstName: personName, lastName: personName });
+
+/** The guest a looked-up name belongs to, with their name as it's written on the guest list. */
+export const listedGuest = z.object({
+  id: z.string(),
+  firstName: z.string(),
+  lastName: z.string(),
+  /** Most people this guest's RSVP can include, themselves included. */
+  spots: z.number().int().min(1).max(MAX_PARTY),
+});
+export type ListedGuest = z.infer<typeof listedGuest>;
+
+export const lookupResponse = z.discriminatedUnion("found", [
+  z.object({ found: z.literal(false) }),
+  z.object({
+    found: z.literal(true),
+    guest: listedGuest,
+    /** True when this guest already has an RSVP; a new one replaces it. */
+    answered: z.boolean(),
+  }),
+]);
+export type LookupResponse = z.infer<typeof lookupResponse>;
 
 export const rsvpPerson = z.object({
   firstName: personName,
@@ -26,7 +46,8 @@ export const rsvpPerson = z.object({
 });
 
 export const rsvpSubmission = z.object({
-  code: rsvpCode,
+  guestId: z.string().min(1).max(64),
+  /** The listed guest first, then anyone else they're answering for. */
   people: z.array(rsvpPerson).min(1).max(MAX_PARTY),
   email: z.email().max(254),
   songRequest: optionalText(200),
@@ -46,7 +67,11 @@ export type ApiError = z.infer<typeof apiError>;
 
 export const adminRsvp = z.object({
   id: z.string(),
+  /** Null for RSVPs sent with the old shared code, before the guest list. */
+  guestId: z.string().nullable(),
   createdAt: z.string(),
+  /** When a newer RSVP from the same guest replaced this one; null while it's current. */
+  replacedAt: z.string().nullable(),
   email: z.string(),
   songRequest: z.string().nullable(),
   note: z.string().nullable(),
@@ -73,13 +98,30 @@ export const adminContribution = z.object({
 });
 export type AdminContribution = z.infer<typeof adminContribution>;
 
+export const adminGuest = z.object({
+  id: z.string(),
+  firstName: z.string(),
+  lastName: z.string(),
+  spots: z.number().int(),
+  /** When their current RSVP arrived; null if they haven't answered. */
+  answeredAt: z.string().nullable(),
+  /** People attending on their current RSVP; null if they haven't answered. */
+  attending: z.number().int().nullable(),
+});
+export type AdminGuest = z.infer<typeof adminGuest>;
+
 export const adminSummary = z.object({
+  /** Replaced RSVPs are left out of every total. */
   totals: z.object({
+    places: z.number().int(),
     rsvps: z.number().int(),
     attending: z.number().int(),
     declining: z.number().int(),
+    notAnswered: z.number().int(),
   }),
-  /** Newest first. */
+  /** In guest-list order. */
+  guests: z.array(adminGuest),
+  /** Newest first, replaced ones included. */
   rsvps: z.array(adminRsvp),
   gifts: z.array(adminContribution),
 });

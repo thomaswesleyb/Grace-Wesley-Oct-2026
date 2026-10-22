@@ -1,5 +1,7 @@
+import type { NameCandidate } from "@shared/names.ts";
 import type {
   AdminContribution,
+  AdminGuest,
   AdminRsvp,
   ParsedRsvpSubmission,
   RegistryItem,
@@ -13,19 +15,60 @@ export async function getSetting(db: D1Database, key: string): Promise<string | 
   return row?.value ?? null;
 }
 
-/** Saves one RSVP form and everyone on it in a single batch. */
+export interface GuestRow {
+  id: string;
+  first_name: string;
+  last_name: string;
+  spots: number;
+}
+
+/** Every name a guest can be found by: their listed name and each alias. */
+export async function nameCandidates(db: D1Database): Promise<NameCandidate[]> {
+  const { results } = await db
+    .prepare(
+      `SELECT id AS guestId, name_key AS nameKey FROM guests
+       UNION ALL SELECT guest_id, name_key FROM guest_aliases`,
+    )
+    .all<NameCandidate>();
+  return results;
+}
+
+export async function getGuest(db: D1Database, id: string): Promise<GuestRow | null> {
+  return db
+    .prepare("SELECT id, first_name, last_name, spots FROM guests WHERE id = ?")
+    .bind(id)
+    .first<GuestRow>();
+}
+
+export async function hasCurrentRsvp(db: D1Database, guestId: string): Promise<boolean> {
+  const row = await db
+    .prepare("SELECT 1 FROM rsvps WHERE guest_id = ? AND replaced_at IS NULL")
+    .bind(guestId)
+    .first();
+  return row !== null;
+}
+
+/**
+ * Saves one guest's RSVP and everyone on it in a single batch, marking their earlier RSVP as
+ * replaced. Returns true when there was an earlier RSVP.
+ */
 export async function insertRsvp(
   db: D1Database,
+  guestId: string,
   body: ParsedRsvpSubmission,
   now: string,
-): Promise<void> {
+): Promise<{ replaced: boolean }> {
   const rsvpId = crypto.randomUUID();
-  await db.batch([
+  const [replaced] = await db.batch([
+    db
+      .prepare("UPDATE rsvps SET replaced_at = ? WHERE guest_id = ? AND replaced_at IS NULL")
+      .bind(now, guestId),
     db
       .prepare(
-        "INSERT INTO rsvps (id, email, song_request, note, created_at) VALUES (?, ?, ?, ?, ?)",
+        `INSERT INTO rsvps (id, guest_id, email, song_request, note, created_at)
+         VALUES (?, ?, ?, ?, ?, ?)`,
       )
-      .bind(rsvpId, body.email, body.songRequest, body.note, now),
+      .bind(rsvpId, guestId, body.email, body.songRequest, body.note, now),
     ...body.people.map((p, sort) =>
       db
         .prepare(
@@ -43,19 +86,41 @@ export async function insertRsvp(
         ),
     ),
   ]);
+  return { replaced: (replaced?.meta.changes ?? 0) > 0 };
 }
 
-/** Deletes one RSVP and everyone on it. Returns false when there's no RSVP with that id. */
+/**
+ * Deletes one RSVP and everyone on it. When it was a guest's current RSVP, their most recent
+ * earlier one becomes current again. Returns false when there's no RSVP with that id.
+ */
 export async function deleteRsvp(db: D1Database, id: string): Promise<boolean> {
-  const results = await db.batch([
+  const target = await db
+    .prepare("SELECT guest_id, replaced_at FROM rsvps WHERE id = ?")
+    .bind(id)
+    .first<{ guest_id: string | null; replaced_at: string | null }>();
+  if (target === null) return false;
+  const statements = [
     db.prepare("DELETE FROM rsvp_people WHERE rsvp_id = ?").bind(id),
     db.prepare("DELETE FROM rsvps WHERE id = ?").bind(id),
-  ]);
-  return results.at(-1)?.meta.changes === 1;
+  ];
+  if (target.guest_id !== null && target.replaced_at === null) {
+    statements.push(
+      db
+        .prepare(
+          `UPDATE rsvps SET replaced_at = NULL WHERE id = (
+             SELECT id FROM rsvps WHERE guest_id = ? ORDER BY created_at DESC, rowid DESC LIMIT 1)`,
+        )
+        .bind(target.guest_id),
+    );
+  }
+  const results = await db.batch(statements);
+  return results[1]?.meta.changes === 1;
 }
 
 interface RsvpRow {
   id: string;
+  guest_id: string | null;
+  replaced_at: string | null;
   email: string;
   song_request: string | null;
   note: string | null;
@@ -80,7 +145,9 @@ export async function listAdminRsvps(db: D1Database): Promise<AdminRsvp[]> {
   const byRsvp = Map.groupBy(people.results, (p) => p.rsvp_id);
   return rsvps.results.map((r) => ({
     id: r.id,
+    guestId: r.guest_id,
     createdAt: r.created_at,
+    replacedAt: r.replaced_at,
     email: r.email,
     songRequest: r.song_request,
     note: r.note,
@@ -91,6 +158,27 @@ export async function listAdminRsvps(db: D1Database): Promise<AdminRsvp[]> {
       attending: p.attending === 1,
       dietary: p.dietary,
     })),
+  }));
+}
+
+/** Every guest in guest-list order, with their current RSVP's date and attending count. */
+export async function listAdminGuests(db: D1Database): Promise<AdminGuest[]> {
+  const { results } = await db
+    .prepare(
+      `SELECT g.id, g.first_name, g.last_name, g.spots, r.created_at AS answered_at,
+         (SELECT SUM(p.attending) FROM rsvp_people p WHERE p.rsvp_id = r.id) AS attending
+       FROM guests g
+       LEFT JOIN rsvps r ON r.guest_id = g.id AND r.replaced_at IS NULL
+       ORDER BY g.sort`,
+    )
+    .all<GuestRow & { answered_at: string | null; attending: number | null }>();
+  return results.map((g) => ({
+    id: g.id,
+    firstName: g.first_name,
+    lastName: g.last_name,
+    spots: g.spots,
+    answeredAt: g.answered_at,
+    attending: g.answered_at === null ? null : (g.attending ?? 0),
   }));
 }
 

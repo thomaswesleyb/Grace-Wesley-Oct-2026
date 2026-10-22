@@ -261,6 +261,7 @@ a:hover {
   border-radius: var(--radius);
   background: rgb(31 22 16 / 0.45);
   text-align: center;
+  overflow-wrap: anywhere;
 }
 
 .notice.error {

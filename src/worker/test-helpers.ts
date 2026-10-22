@@ -1,10 +1,8 @@
 import { createExecutionContext, waitOnExecutionContext } from "cloudflare:test";
 import { env } from "cloudflare:workers";
+import { nameKey } from "@shared/names.ts";
 import app from "@worker/index.ts";
 import type { Env } from "@worker/env.ts";
-
-/** Matches the RSVP_CODE binding in vitest.config.ts. */
-export const CODE = "10232027";
 
 export async function resetDb(): Promise<void> {
   await env.DB.batch([
@@ -12,14 +10,34 @@ export async function resetDb(): Promise<void> {
     env.DB.prepare("DELETE FROM registry_items"),
     env.DB.prepare("DELETE FROM rsvp_people"),
     env.DB.prepare("DELETE FROM rsvps"),
+    env.DB.prepare("DELETE FROM guest_aliases"),
+    env.DB.prepare("DELETE FROM guests"),
     env.DB.prepare("UPDATE settings SET value = '1' WHERE key = 'rsvp_open'"),
   ]);
 }
 
-/** A valid RSVP from one attending guest; spread overrides on top. */
+/** Adds one guest to the guest list, with optional alias keys. */
+export async function seedGuest(
+  id: string,
+  first: string,
+  last: string,
+  spots: number,
+  aliasKeys: string[] = [],
+): Promise<void> {
+  await env.DB.batch([
+    env.DB.prepare(
+      "INSERT INTO guests (id, first_name, last_name, name_key, spots, sort) VALUES (?, ?, ?, ?, ?, 0)",
+    ).bind(id, first, last, nameKey(first, last), spots),
+    ...aliasKeys.map((key) =>
+      env.DB.prepare("INSERT INTO guest_aliases (guest_id, name_key) VALUES (?, ?)").bind(id, key),
+    ),
+  ]);
+}
+
+/** A valid RSVP from guest "sam" (see `seedGuest`) attending alone; spread overrides on top. */
 export function rsvpBody(overrides: Record<string, unknown> = {}) {
   return {
-    code: CODE,
+    guestId: "sam",
     people: [{ firstName: "Sam", lastName: "Lee", attending: true, dietary: "" }],
     email: "guest@example.com",
     ...overrides,

@@ -1,17 +1,17 @@
 import { useState } from "react";
 import { apiFetch, ApiRequestError } from "@client/api.ts";
 import {
-  CodeStep,
   DetailsStep,
+  FindStep,
   DoneStep,
   RespondStep,
   ReviewStep,
 } from "@client/pages/RsvpSteps.tsx";
-import { emptyDraft, toSubmission, type Draft } from "@client/pages/rsvp-state.ts";
-import { rsvpResult, okResponse, type RsvpResult } from "@shared/schemas.ts";
+import { draftFor, toSubmission, type Draft } from "@client/pages/rsvp-state.ts";
+import { lookupResponse, rsvpResult, type ListedGuest, type RsvpResult } from "@shared/schemas.ts";
 import "@client/pages/rsvp.css";
 
-type Step = "code" | "respond" | "details" | "review" | "done";
+type Step = "find" | "respond" | "details" | "review" | "done";
 
 const STEP_LABELS: [Step, string][] = [
   ["respond", "Respond"],
@@ -37,9 +37,11 @@ function Progress({ step }: { step: Step }) {
 }
 
 function useRsvpFlow() {
-  const [step, setStep] = useState<Step>("code");
-  const [code, setCode] = useState("");
-  const [draft, setDraft] = useState<Draft>(emptyDraft);
+  const [step, setStep] = useState<Step>("find");
+  const [guest, setGuest] = useState<ListedGuest | null>(null);
+  const [answered, setAnswered] = useState(false);
+  const [notFound, setNotFound] = useState(false);
+  const [draft, setDraft] = useState<Draft | null>(null);
   const [result, setResult] = useState<RsvpResult | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -64,19 +66,27 @@ function useRsvpFlow() {
     }
   };
 
-  const unlock = (typed: string) =>
+  const find = (firstName: string, lastName: string) =>
     run(async () => {
-      await apiFetch("/api/rsvp/unlock", okResponse, {
+      setNotFound(false);
+      const reply = await apiFetch("/api/rsvp/lookup", lookupResponse, {
         method: "POST",
-        body: { code: typed },
+        body: { firstName, lastName },
       });
-      setCode(typed);
+      if (!reply.found) {
+        setNotFound(true);
+        return;
+      }
+      setGuest(reply.guest);
+      setAnswered(reply.answered);
+      setDraft(draftFor(reply.guest));
       goTo("respond");
     });
 
   const submit = () =>
     run(async () => {
-      const body = toSubmission(code, draft);
+      if (guest === null || draft === null) return;
+      const body = toSubmission(guest.id, draft);
       setResult(await apiFetch("/api/rsvp", rsvpResult, { method: "POST", body }));
       goTo("done");
     });
@@ -86,17 +96,36 @@ function useRsvpFlow() {
     setDraft(next);
   };
 
-  return { step, draft, result, busy, error, updateDraft, setError, goTo, unlock, submit };
+  return {
+    step,
+    guest,
+    answered,
+    notFound,
+    draft,
+    result,
+    busy,
+    error,
+    updateDraft,
+    setError,
+    goTo,
+    find,
+    submit,
+  };
 }
 
-function StepBody({ flow }: { flow: ReturnType<typeof useRsvpFlow> }) {
+type Flow = ReturnType<typeof useRsvpFlow>;
+
+/** The steps after the guest is found, so their invitation and draft are always there. */
+function GuestStep({ flow, guest, draft }: { flow: Flow; guest: ListedGuest; draft: Draft }) {
   switch (flow.step) {
-    case "code":
-      return <CodeStep busy={flow.busy} onUnlock={flow.unlock} />;
+    case "find":
+      return null;
     case "respond":
       return (
         <RespondStep
-          draft={flow.draft}
+          guest={guest}
+          answered={flow.answered}
+          draft={draft}
           onChange={flow.updateDraft}
           onNext={() => flow.goTo("details")}
           onError={flow.setError}
@@ -105,7 +134,7 @@ function StepBody({ flow }: { flow: ReturnType<typeof useRsvpFlow> }) {
     case "details":
       return (
         <DetailsStep
-          draft={flow.draft}
+          draft={draft}
           onChange={flow.updateDraft}
           onBack={() => flow.goTo("respond")}
           onNext={() => flow.goTo("review")}
@@ -113,16 +142,24 @@ function StepBody({ flow }: { flow: ReturnType<typeof useRsvpFlow> }) {
       );
     case "review":
       return (
-        <ReviewStep draft={flow.draft} busy={flow.busy} onEdit={flow.goTo} onSubmit={flow.submit} />
+        <ReviewStep draft={draft} busy={flow.busy} onEdit={flow.goTo} onSubmit={flow.submit} />
       );
     case "done":
       return flow.result === null ? null : <DoneStep result={flow.result} />;
   }
 }
 
+function StepBody({ flow }: { flow: Flow }) {
+  const { guest, draft } = flow;
+  if (flow.step === "find" || guest === null || draft === null) {
+    return <FindStep busy={flow.busy} notFound={flow.notFound} onFind={flow.find} />;
+  }
+  return <GuestStep flow={flow} guest={guest} draft={draft} />;
+}
+
 export function Rsvp() {
   const flow = useRsvpFlow();
-  const showProgress = flow.step !== "code" && flow.step !== "done";
+  const showProgress = flow.step !== "find" && flow.step !== "done";
   return (
     <>
       <section className="page rsvp">

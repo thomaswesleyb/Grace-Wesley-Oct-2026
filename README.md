@@ -17,6 +17,7 @@ Requires Node 22 (`nvm use 22`) and pnpm 12.
 | `pnpm gen:backdrops` | Make blurred-backdrop copies of every photo in `background-images/` and rebuild `content/backdrops.json` (`dev` and `build` run it too). Every page except Home and admin picks one at random |
 | `pnpm check` | Lint, format check, type check, tests |
 | `pnpm db:migrate:local` / `db:migrate:remote` | Apply `migrations/` to the local or production database |
+| `pnpm seed:guests --local\|--remote [file.csv]` | Load or update the guest list (default `guest-list.csv`) |
 | `pnpm seed:registry --local\|--remote [file.csv]` | Load or update registry items (default `wedding-registry.csv`) |
 | `pnpm deploy` | Build and deploy to Cloudflare |
 
@@ -24,17 +25,25 @@ Site facts come from `DETAILS.md`. Edit it, then run `pnpm gen` (dev and build r
 
 ## RSVP
 
-Guests unlock the RSVP form with a shared code. There's no guest list on the site.
+Guests find their own name on the guest list, then answer for up to their number of places.
 
-- The code is the `RSVP_CODE` secret (`pnpm exec wrangler secret put RSVP_CODE`; locally, a
-  `RSVP_CODE=…` line in `.dev.vars`). It never reaches the browser or the repo. Case, spaces,
-  dashes, slashes and dots are ignored, so `10/23/2027` matches `10232027`. While it's unset,
-  every RSVP is refused with "RSVPs aren't open yet."
-- The server checks the code when the form is unlocked and again on submit. Both share a limit
-  of 10 tries a minute per IP address.
-- One form covers up to 6 people: name, accept or decline, and dietary needs for each, plus an
-  email, song request and note. Each submission is saved and emailed to `ALERT_TO`.
-- Nothing stops a household from sending twice. Admin lists every submission, newest first.
+- The guest list is `guest-list.csv` (gitignored; the commit hook blocks it). Columns:
+  `firstname,lastname,total_guest_spots`, plus an optional `aliases` column of other names
+  separated by `;` (`Bill; Will Smith-Jones`). A one-word alias is a first name and takes the
+  guest's last name. `total_guest_spots` is the most people on that guest's RSVP, themselves
+  included (0 to 6). 0 means invited but can't attend, and looking them up says "not found".
+- `pnpm seed:guests --local|--remote` loads it. It checks every row first and changes nothing if
+  any is wrong. It's safe to re-run after edits, since guests are matched by name. It refuses to
+  drop a guest who has answered: to rename one, keep the old spelling and add the new one as an
+  alias.
+- Lookup ignores case, accents, punctuation and hyphens. It allows 1 typo in names of 8 to 13
+  characters and 2 typos from 14, and knows common nicknames (`src/shared/nicknames.ts`). A name
+  that two guests match equally well is "not found" rather than a guess.
+- The server checks the guest and the party size on every submit. The listed guest is always
+  saved under their name from the list. Lookups and submits share a limit of 10 a minute per IP
+  address.
+- Sending again replaces the guest's earlier RSVP. Admin keeps the old one (marked "Replaced"),
+  totals count only current answers, and the alert subject says "(changed)".
 - To close RSVPs, set `rsvp_open` to `0`:
   `pnpm exec wrangler d1 execute wedding --remote --command "UPDATE settings SET value = '0' WHERE key = 'rsvp_open'"`.
 
@@ -60,7 +69,7 @@ To hide the page before launch, remove the Registry link in `src/client/componen
 3. `pnpm exec wrangler d1 create wedding`, then paste the printed `database_id` into
    `wrangler.jsonc`.
 4. `pnpm db:migrate:remote`
-5. `pnpm exec wrangler secret put RSVP_CODE`, and type the code when asked.
+5. `pnpm seed:guests --remote` to load `guest-list.csv`.
 6. `pnpm deploy`, then attach the custom domain to the Worker in the Cloudflare dashboard.
 7. **Protect admin:** Zero Trust → Access → Applications → self-hosted app for
    `parkhillbaileywedding.com/admin*` and `parkhillbaileywedding.com/api/admin*`, policy "Emails"

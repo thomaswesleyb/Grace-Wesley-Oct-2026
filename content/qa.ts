@@ -132,8 +132,8 @@ export const QA_ENTRIES: QaEntry[] = [
     question: "How do I RSVP?",
     requires: ["RSVP method", "Website URL"],
     answer: (fact) =>
-      `RSVP ${fact("RSVP method")}: ${fact("Website URL")}. Enter your RSVP code on the RSVP ` +
-      "page, then add everyone on your invitation and whether each person can attend.",
+      `RSVP ${fact("RSVP method")}: ${fact("Website URL")}. Find your name on the RSVP page, ` +
+      "then tell us whether you and anyone on your invitation can attend.",
   },
   {
     topic: "Registry & more",

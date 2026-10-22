@@ -2,31 +2,36 @@ import { describe, expect, it } from "vitest";
 import {
   addPerson,
   canAddPerson,
-  emptyDraft,
+  draftFor,
   removePerson,
   respondProblem,
   toSubmission,
   updatePerson,
   type Draft,
 } from "@client/pages/rsvp-state.ts";
-import { MAX_PARTY } from "@shared/schemas.ts";
+import type { ListedGuest } from "@shared/schemas.ts";
+
+const sam: ListedGuest = { id: "g1", firstName: "Sam", lastName: "Lee", spots: 3 };
 
 function named(draft: Draft, index: number, firstName: string, attending: boolean | null) {
   const key = draft.people[index]!.key;
   return updatePerson(draft, key, { firstName, lastName: "Lee", attending });
 }
 
+const answer = (draft: Draft, index: number, attending: boolean) =>
+  updatePerson(draft, draft.people[index]!.key, { attending });
+
 describe("rsvp draft", () => {
-  it("starts with one empty person", () => {
-    const draft = emptyDraft();
-    expect(draft.people).toHaveLength(1);
-    expect(respondProblem(draft)).toMatch(/first and last name/);
+  it("starts with the listed guest, named, and no answer yet", () => {
+    const draft = draftFor(sam);
+    expect(draft.people).toMatchObject([{ firstName: "Sam", lastName: "Lee", attending: null }]);
+    expect(respondProblem(draft)).toMatch(/whether they'll attend/);
   });
 
   it("requires a name and an answer for every person", () => {
-    let draft = named(emptyDraft(), 0, "Sam", true);
+    let draft = answer(draftFor(sam), 0, true);
     expect(respondProblem(draft)).toBeNull();
-    draft = addPerson(draft);
+    draft = addPerson(draft, sam.spots);
     expect(respondProblem(draft)).toMatch(/first and last name/);
     draft = named(draft, 1, "Kim", null);
     expect(respondProblem(draft)).toMatch(/whether they'll attend/);
@@ -35,19 +40,25 @@ describe("rsvp draft", () => {
   });
 
   it("treats a name of only spaces as missing", () => {
-    const draft = named(emptyDraft(), 0, "   ", true);
+    const draft = named(addPerson(answer(draftFor(sam), 0, true), 2), 1, "   ", true);
     expect(respondProblem(draft)).toMatch(/first and last name/);
   });
 
-  it(`stops adding people at ${MAX_PARTY}`, () => {
-    let draft = emptyDraft();
-    for (let i = 0; i < MAX_PARTY + 2; i++) draft = addPerson(draft);
-    expect(draft.people).toHaveLength(MAX_PARTY);
-    expect(canAddPerson(draft)).toBe(false);
+  it("stops adding people at the guest's number of places", () => {
+    let draft = draftFor(sam);
+    for (let i = 0; i < sam.spots + 2; i++) draft = addPerson(draft, sam.spots);
+    expect(draft.people).toHaveLength(sam.spots);
+    expect(canAddPerson(draft, sam.spots)).toBe(false);
   });
 
-  it("removes only the chosen person, and never the first", () => {
-    let draft = addPerson(addPerson(emptyDraft()));
+  it("can't add anyone for a guest with one place", () => {
+    const draft = draftFor({ ...sam, spots: 1 });
+    expect(canAddPerson(draft, 1)).toBe(false);
+    expect(addPerson(draft, 1).people).toHaveLength(1);
+  });
+
+  it("removes only the chosen person, and never the listed guest", () => {
+    let draft = addPerson(addPerson(draftFor(sam), 3), 3);
     const [first, second, third] = draft.people;
     draft = removePerson(draft, second!.key);
     expect(draft.people.map((p) => p.key)).toEqual([first!.key, third!.key]);
@@ -55,14 +66,14 @@ describe("rsvp draft", () => {
   });
 
   it("drops the dietary note of someone declining and trims the email", () => {
-    let draft = addPerson(emptyDraft());
-    draft = named(draft, 0, "Sam", false);
+    let draft = addPerson(draftFor(sam), sam.spots);
+    draft = answer(draft, 0, false);
     draft = updatePerson(draft, draft.people[0]!.key, { dietary: "nuts" });
     draft = named(draft, 1, "Kim", true);
     draft = updatePerson(draft, draft.people[1]!.key, { dietary: "vegan" });
     draft.email = "  sam@example.com ";
-    expect(toSubmission("10232027", draft)).toEqual({
-      code: "10232027",
+    expect(toSubmission("g1", draft)).toEqual({
+      guestId: "g1",
       people: [
         { firstName: "Sam", lastName: "Lee", attending: false, dietary: "" },
         { firstName: "Kim", lastName: "Lee", attending: true, dietary: "vegan" },

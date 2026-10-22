@@ -2,7 +2,7 @@ import { Hono } from "hono";
 import { createMiddleware } from "hono/factory";
 import { createRemoteJWKSet, jwtVerify } from "jose";
 import type { AdminSummary } from "@shared/schemas.ts";
-import { deleteRsvp, listAdminRsvps, listPaidContributions } from "@worker/db.ts";
+import { deleteRsvp, listAdminGuests, listAdminRsvps, listPaidContributions } from "@worker/db.ts";
 import type { Env } from "@worker/env.ts";
 
 const jwksByTeam = new Map<string, ReturnType<typeof createRemoteJWKSet>>();
@@ -42,14 +42,23 @@ export const admin = new Hono<{ Bindings: Env }>();
 admin.use("*", requireAccess);
 
 admin.get("/summary", async (c) => {
-  const [rsvps, gifts] = await Promise.all([
+  const [guests, rsvps, gifts] = await Promise.all([
+    listAdminGuests(c.env.DB),
     listAdminRsvps(c.env.DB),
     listPaidContributions(c.env.DB),
   ]);
-  const people = rsvps.flatMap((r) => r.people);
+  const current = rsvps.filter((r) => r.replacedAt === null);
+  const people = current.flatMap((r) => r.people);
   const attending = people.filter((p) => p.attending).length;
   return c.json({
-    totals: { rsvps: rsvps.length, attending, declining: people.length - attending },
+    totals: {
+      places: guests.reduce((sum, g) => sum + g.spots, 0),
+      rsvps: current.length,
+      attending,
+      declining: people.length - attending,
+      notAnswered: guests.filter((g) => g.spots > 0 && g.answeredAt === null).length,
+    },
+    guests,
     rsvps,
     gifts,
   } satisfies AdminSummary);

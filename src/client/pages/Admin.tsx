@@ -5,6 +5,7 @@ import {
   adminSummary,
   okResponse,
   type AdminContribution,
+  type AdminGuest,
   type AdminRsvp,
   type AdminSummary,
 } from "@shared/schemas.ts";
@@ -15,10 +16,20 @@ const csvCell = (value: string | null) => {
   return /[",\n]/.test(text) ? `"${text.replaceAll('"', '""')}"` : text;
 };
 
-/** One row per person, for spreadsheets and caterer counts. `rsvp_id` groups a household. */
-export function toCsv(rsvps: AdminRsvp[]): string {
+const guestName = (guest: AdminGuest | undefined) =>
+  guest === undefined ? null : `${guest.firstName} ${guest.lastName}`;
+
+/**
+ * One row per person, for spreadsheets and caterer counts. `rsvp_id` groups one form, and
+ * `current` is "No" on answers a guest later replaced.
+ */
+export function toCsv(rsvps: AdminRsvp[], guests: AdminGuest[]): string {
+  const byId = new Map(guests.map((g) => [g.id, g]));
   const header = [
     "rsvp_id",
+    "guest",
+    "spots",
+    "current",
     "first_name",
     "last_name",
     "attending",
@@ -28,9 +39,13 @@ export function toCsv(rsvps: AdminRsvp[]): string {
     "note",
     "submitted_at",
   ];
-  const rows = rsvps.flatMap((r) =>
-    r.people.map((p) => [
+  const rows = rsvps.flatMap((r) => {
+    const guest = r.guestId === null ? undefined : byId.get(r.guestId);
+    return r.people.map((p) => [
       r.id,
+      guestName(guest),
+      guest === undefined ? null : String(guest.spots),
+      r.replacedAt === null ? "Yes" : "No",
       p.firstName,
       p.lastName,
       p.attending ? "Yes" : "No",
@@ -39,13 +54,13 @@ export function toCsv(rsvps: AdminRsvp[]): string {
       r.songRequest,
       r.note,
       r.createdAt,
-    ]),
-  );
+    ]);
+  });
   return [header, ...rows].map((row) => row.map(csvCell).join(",")).join("\n");
 }
 
-function download(rsvps: AdminRsvp[]) {
-  const url = URL.createObjectURL(new Blob([toCsv(rsvps)], { type: "text/csv" }));
+function download(rsvps: AdminRsvp[], guests: AdminGuest[]) {
+  const url = URL.createObjectURL(new Blob([toCsv(rsvps, guests)], { type: "text/csv" }));
   const link = document.createElement("a");
   link.href = url;
   link.download = `rsvps-${new Date().toISOString().slice(0, 10)}.csv`;
@@ -55,9 +70,10 @@ function download(rsvps: AdminRsvp[]) {
 
 function TotalTiles({ totals }: { totals: AdminSummary["totals"] }) {
   const tiles: [string, number, string][] = [
+    ["Places", totals.places, "Seats offered across the guest list"],
     ["Attending", totals.attending, "People who said yes"],
     ["Declining", totals.declining, "People who said no"],
-    ["RSVPs", totals.rsvps, "Forms received. A household that sent twice counts twice."],
+    ["Not answered", totals.notAnswered, "Guests with places who haven't sent an RSVP"],
   ];
   return (
     <div className="admin-tiles">
@@ -73,6 +89,7 @@ function TotalTiles({ totals }: { totals: AdminSummary["totals"] }) {
 
 interface RsvpRowProps {
   rsvp: AdminRsvp;
+  guest: AdminGuest | undefined;
   busy: boolean;
   onDelete: (rsvp: AdminRsvp) => void;
 }
@@ -116,10 +133,18 @@ function DeleteControl({ rsvp, busy, onDelete }: RsvpRowProps) {
 }
 
 function RsvpRow(props: RsvpRowProps) {
-  const { rsvp } = props;
+  const { rsvp, guest } = props;
+  const replaced = rsvp.replacedAt !== null;
   return (
-    <tr>
-      <td>{rsvp.createdAt.slice(0, 10)}</td>
+    <tr className={replaced ? "admin-replaced" : undefined}>
+      <td>
+        {rsvp.createdAt.slice(0, 10)}
+        {replaced && <div className="admin-muted">Replaced</div>}
+      </td>
+      <td>
+        {guestName(guest) ?? <span className="admin-muted">Not linked</span>}
+        {guest !== undefined && <div className="admin-muted">{guest.spots} places</div>}
+      </td>
       <td>
         {rsvp.people.map((p) => (
           <div key={p.id}>
@@ -179,6 +204,46 @@ function GiftsTable({ gifts }: { gifts: AdminContribution[] }) {
   );
 }
 
+function GuestsTable({ guests }: { guests: AdminGuest[] }) {
+  const [onlyWaiting, setOnlyWaiting] = useState(false);
+  const shown = onlyWaiting ? guests.filter((g) => g.spots > 0 && g.answeredAt === null) : guests;
+  return (
+    <section className="admin-guests" aria-labelledby="guests-heading">
+      <h2 id="guests-heading">Guest list</h2>
+      <label className="admin-filter">
+        <input
+          type="checkbox"
+          checked={onlyWaiting}
+          onChange={(e) => setOnlyWaiting(e.target.checked)}
+        />
+        Only guests who haven't answered
+      </label>
+      <div className="admin-table-wrap">
+        <table className="admin-table">
+          <thead>
+            <tr>
+              <th>Guest</th>
+              <th>Places</th>
+              <th>Answered</th>
+              <th>Attending</th>
+            </tr>
+          </thead>
+          <tbody>
+            {shown.map((g) => (
+              <tr key={g.id}>
+                <td>{guestName(g)}</td>
+                <td>{g.spots === 0 ? "Can't attend" : g.spots}</td>
+                <td>{g.answeredAt?.slice(0, 10) ?? ""}</td>
+                <td>{g.attending ?? ""}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </section>
+  );
+}
+
 const errorMessage = (e: unknown, fallback: string) =>
   e instanceof ApiRequestError ? e.message : fallback;
 
@@ -212,6 +277,7 @@ export function Admin() {
     setDeleting(false);
   };
 
+  const guestsById = new Map(summary?.guests.map((g) => [g.id, g]));
   return (
     <section className="page admin">
       <h1>RSVPs</h1>
@@ -221,7 +287,11 @@ export function Admin() {
         <>
           <TotalTiles totals={summary.totals} />
           <div className="actions">
-            <button className="button" type="button" onClick={() => download(summary.rsvps)}>
+            <button
+              className="button"
+              type="button"
+              onClick={() => download(summary.rsvps, summary.guests)}
+            >
               Download CSV
             </button>
           </div>
@@ -233,6 +303,7 @@ export function Admin() {
                 <thead>
                   <tr>
                     <th>Date</th>
+                    <th>Guest</th>
                     <th>People</th>
                     <th>Email</th>
                     <th>Song</th>
@@ -244,12 +315,19 @@ export function Admin() {
                 </thead>
                 <tbody>
                   {summary.rsvps.map((rsvp) => (
-                    <RsvpRow key={rsvp.id} rsvp={rsvp} busy={deleting} onDelete={remove} />
+                    <RsvpRow
+                      key={rsvp.id}
+                      rsvp={rsvp}
+                      guest={guestsById.get(rsvp.guestId ?? "")}
+                      busy={deleting}
+                      onDelete={remove}
+                    />
                   ))}
                 </tbody>
               </table>
             </div>
           )}
+          <GuestsTable guests={summary.guests} />
           <GiftsTable gifts={summary.gifts} />
         </>
       )}

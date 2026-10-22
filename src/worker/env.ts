@@ -1,9 +1,7 @@
 export interface Env {
   DB: D1Database;
-  /** Per-IP limit on RSVP code tries and submissions. */
+  /** Per-IP limit on RSVP name lookups and submissions. */
   RSVP_LIMITER: RateLimit;
-  /** Shared code that unlocks the RSVP form (secret). RSVPs are refused while it's unset. */
-  RSVP_CODE?: string;
   /** Cloudflare Access team domain, e.g. "parkhillbailey.cloudflareaccess.com". */
   ACCESS_TEAM_DOMAIN: string;
   /** Cloudflare Access application audience (AUD) tag for /admin. */

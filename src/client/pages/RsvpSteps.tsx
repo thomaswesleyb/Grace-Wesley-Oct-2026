@@ -10,36 +10,61 @@ import {
   type PersonDraft,
 } from "@client/pages/rsvp-state.ts";
 import { site } from "@client/site.ts";
-import { MAX_PARTY, type RsvpResult } from "@shared/schemas.ts";
+import type { ListedGuest, RsvpResult } from "@shared/schemas.ts";
 
 const fullName = (p: { firstName: string; lastName: string }) =>
   `${p.firstName.trim()} ${p.lastName.trim()}`.trim();
 
-export function CodeStep({ busy, onUnlock }: { busy: boolean; onUnlock: (code: string) => void }) {
-  const [code, setCode] = useState("");
+interface FindProps {
+  busy: boolean;
+  notFound: boolean;
+  onFind: (firstName: string, lastName: string) => void;
+}
+
+export function FindStep({ busy, notFound, onFind }: FindProps) {
+  const [firstName, setFirstName] = useState("");
+  const [lastName, setLastName] = useState("");
   const submit = (event: FormEvent) => {
     event.preventDefault();
-    onUnlock(code);
+    onFind(firstName, lastName);
   };
   return (
     <form className="panel" onSubmit={submit}>
-      <h2 className="rsvp-label">Enter your RSVP code</h2>
-      <p className="rsvp-muted">Don't have it? Contact us: {site.contact}</p>
-      <div className="field">
-        <label htmlFor="rsvp-code">RSVP code</label>
-        <input
-          id="rsvp-code"
-          autoComplete="off"
-          inputMode="numeric"
-          required
-          maxLength={40}
-          value={code}
-          onChange={(e) => setCode(e.target.value)}
-        />
+      <h2 className="rsvp-label">Find your invitation</h2>
+      <p className="rsvp-muted">Enter your name as it appears on your invitation.</p>
+      {notFound && (
+        <p className="notice error" role="alert">
+          We couldn't find that name on our guest list. Please try it exactly as it's written on
+          your invitation, or contact us: {site.contact}
+        </p>
+      )}
+      <div className="row">
+        <div className="field">
+          <label htmlFor="find-first">First name</label>
+          <input
+            id="find-first"
+            autoComplete="given-name"
+            required
+            maxLength={60}
+            value={firstName}
+            onChange={(e) => setFirstName(e.target.value)}
+          />
+        </div>
+        <div className="field">
+          <label htmlFor="find-last">Last name</label>
+          <input
+            id="find-last"
+            autoComplete="family-name"
+            required
+            maxLength={60}
+            value={lastName}
+            onChange={(e) => setLastName(e.target.value)}
+          />
+        </div>
       </div>
       <div className="actions">
         <button className="button" type="submit" disabled={busy}>
-          {busy ? "Checking…" : "Continue"}
+          {busy ? "Looking…" : "Find my invitation"}
         </button>
       </div>
     </form>
@@ -87,8 +112,8 @@ function PersonCard(props: PersonProps) {
   const update = (patch: Partial<PersonDraft>) => onChange(updatePerson(draft, id, patch));
   return (
     <fieldset className="rsvp-guest">
-      <legend>{fullName(person) || (index === 0 ? "You" : "Another guest")}</legend>
-      <NameFields {...props} />
+      <legend>{fullName(person) || "Another guest"}</legend>
+      {index > 0 && <NameFields {...props} />}
       <div className="rsvp-choice" role="radiogroup">
         <label data-selected={person.attending === true}>
           <input
@@ -136,13 +161,23 @@ function PersonCard(props: PersonProps) {
 }
 
 interface RespondProps {
+  guest: ListedGuest;
+  /** The guest already has an RSVP, which this one will replace. */
+  answered: boolean;
   draft: Draft;
   onChange: (draft: Draft) => void;
   onNext: () => void;
   onError: (message: string) => void;
 }
 
-export function RespondStep({ draft, onChange, onNext, onError }: RespondProps) {
+function placesLine(spots: number): string {
+  if (spots === 1) return "We've saved a place for you.";
+  if (spots === 2) return "We've saved 2 places: one for you and one for a guest.";
+  return `We've saved ${spots} places for your party.`;
+}
+
+export function RespondStep(props: RespondProps) {
+  const { guest, answered, draft, onChange, onNext, onError } = props;
   const submit = (event: FormEvent) => {
     event.preventDefault();
     const problem = respondProblem(draft);
@@ -151,10 +186,17 @@ export function RespondStep({ draft, onChange, onNext, onError }: RespondProps) 
   };
   return (
     <form className="panel" onSubmit={submit}>
-      <h2 className="rsvp-label">Who's responding?</h2>
+      <h2 className="rsvp-label">
+        Welcome, {guest.firstName} {guest.lastName}
+      </h2>
       <p className="rsvp-muted">
-        Add everyone on your invitation, up to {MAX_PARTY} people, so we can count each seat.
+        {placesLine(guest.spots)}
+        {guest.spots > 1 &&
+          " Add anyone joining you. If you don't know their name yet, write “Guest”."}
       </p>
+      {answered && (
+        <p className="notice">We already have an RSVP from you. Sending this one replaces it.</p>
+      )}
       {draft.people.map((person, index) => (
         <PersonCard
           key={person.key}
@@ -165,13 +207,13 @@ export function RespondStep({ draft, onChange, onNext, onError }: RespondProps) 
         />
       ))}
       <div className="actions">
-        {canAddPerson(draft) && (
+        {canAddPerson(draft, guest.spots) && (
           <button
             className="button secondary"
             type="button"
-            onClick={() => onChange(addPerson(draft))}
+            onClick={() => onChange(addPerson(draft, guest.spots))}
           >
-            Add another person
+            {guest.spots === 2 ? "Add a guest" : "Add someone"}
           </button>
         )}
         <button className="button" type="submit">
@@ -306,7 +348,9 @@ export function DoneStep({ result }: { result: RsvpResult }) {
       ) : (
         <p>You'll be missed, and we're grateful you let us know.</p>
       )}
-      <p className="rsvp-muted">To change your RSVP, please contact us: {site.contact}</p>
+      <p className="rsvp-muted">
+        To change your answer, look up your name again and send a new RSVP. It replaces this one.
+      </p>
       <div className="actions">
         <Link className="button secondary" to="/qa">
           Questions &amp; Answers

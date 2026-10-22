@@ -14,6 +14,7 @@
     "deploy": "pnpm build && node -e \"require('node:fs').rmSync('dist/parkhill_bailey_wedding/.dev.vars', { force: true })\" && wrangler deploy",
     "db:migrate:local": "wrangler d1 migrations apply wedding --local",
     "db:migrate:remote": "wrangler d1 migrations apply wedding --remote",
+    "seed:guests": "tsx scripts/seed-guests.ts",
     "seed:registry": "tsx scripts/seed-registry.ts",
     "test": "pnpm gen && vitest run",
     "lint": "oxlint --deny-warnings",

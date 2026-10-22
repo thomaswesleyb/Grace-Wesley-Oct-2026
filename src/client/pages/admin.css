@@ -70,12 +70,26 @@
   min-width: 12rem;
 }
 
-.admin-gifts {
+.admin-gifts,
+.admin-guests {
   margin-top: 2.5rem;
 }
 
-.admin-gifts h2 {
+.admin-gifts h2,
+.admin-guests h2 {
   margin: 0 0 0.75rem;
   font-size: 1.35rem;
   color: var(--sepia-300);
+}
+
+.admin-replaced td {
+  opacity: 0.6;
+}
+
+.admin-filter {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin-bottom: 0.75rem;
+  cursor: pointer;
 }

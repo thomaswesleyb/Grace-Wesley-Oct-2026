@@ -57,16 +57,18 @@ accessibility); registry and other. Each entry appears only when its answer is i
   the couple. The public sees bars and dollar amounts.
 
 ## RSVP
-- The form is unlocked with one shared code (decided 2026-10-21; it replaced a name lookup
-  against a guest list with waves). The code is checked on the server and never ships to the
-  browser.
-- Only the RSVP form is behind the code. Home, Q&A, Photos and Labyrinth stay public.
-- One person answers for their party, up to 6 people: each person's name, accept or decline,
-  and dietary needs, plus an email, song request and note.
+- Guests find their own name on the guest list (decided 2026-10-22, replacing the shared code
+  of 2026-10-21). Typos, aliases and common nicknames still match. A name that isn't found shows
+  the couple's contact address.
+- Each guest has a number of places (`total_guest_spots`). The form opens with the guest's own
+  name locked, says how many places are saved, and lets them add people up to that number.
+  Each person gets accept or decline and dietary needs, plus one email, song request and note.
+- Answering again replaces the earlier RSVP. Earlier answers are never shown on the page.
+- Only the RSVP form is behind the lookup. Home, Q&A, Photos and Labyrinth stay public.
 - No deadline is shown on the site. The couple gives each group its date when inviting them,
   and closes the form when they're done.
-- Each RSVP is saved and listed in admin, and emailed to the couple. To change an answer, guests
-  contact the couple.
+- Each RSVP is saved and listed in admin, and emailed to the couple. Admin also lists every guest
+  and who hasn't answered.
 
 ## Photos
 - Every photo in `images/` (JPEG, PNG, WebP or HEIC; never modified) is shown. Adding or

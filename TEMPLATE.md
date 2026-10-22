@@ -65,7 +65,7 @@ RSVP button label: {{ RSVP_BUTTON_LABEL }}   <!-- e.g. "I'LL BE THERE!" -->
 ## Wedding — scheduling
 
 Wedding time zone: {{ WEDDING_TIME_ZONE }}   <!-- IANA name, e.g. "America/Chicago" -->
-Couple contact: {{ COUPLE_CONTACT }}   <!-- shown on the RSVP page for guests without the code -->
+Couple contact: {{ COUPLE_CONTACT }}   <!-- shown on the RSVP page when a name isn't found -->
 
 ## Photos and Labyrinth
 

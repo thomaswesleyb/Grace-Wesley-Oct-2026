@@ -1,5 +1,6 @@
 import { cleanRetailerLink } from "@shared/registry.ts";
 import { parseCsv } from "./csv.ts";
+import { sql } from "./sql.ts";
 
 export const REGISTRY_COLUMNS = ["item", "price", "link"] as const;
 /** Optional: `image` is a path under public/ (e.g. "registry/espresso.webp"). */
@@ -83,13 +84,6 @@ export function buildRegistryItems(text: string): SeedRegistryItem[] {
     };
   });
 }
-
-const sql = (value: string | number | null) =>
-  value === null
-    ? "NULL"
-    : typeof value === "number"
-      ? String(value)
-      : `'${value.replaceAll("'", "''")}'`;
 
 /** Upserts by id, so re-running after editing the CSV updates items without touching gifts. */
 export function buildRegistrySql(items: SeedRegistryItem[]): string {

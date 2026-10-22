@@ -73,9 +73,11 @@ use Stripe Checkout. See `README.md` for commands and the one-time deploy steps.
 - Keep the backend minimal. Add server code only for things the frontend can't do on its own.
 - Follow the global Node/TypeScript standards: Node 22 LTS, ESM, strict `tsconfig`, `oxlint`,
   `oxfmt`, `vitest`, pinned dependency versions, and `prek` hooks. `pnpm check` runs them all.
-- RSVP code: guests unlock the form with the shared `RSVP_CODE` secret. The code must never
-  reach the browser bundle, `DETAILS.md` or the repo, and the server checks it on every submit,
-  not just on unlock. Tests in `src/worker/rsvp.test.ts` guard this.
+- RSVP guest list: guests find their own name (typos, aliases and nicknames allowed) in the
+  `guests` table, loaded from the gitignored `guest-list.csv` with `pnpm seed:guests`. Each RSVP
+  is capped at the guest's `spots`, and the server rechecks the guest and party size on every
+  submit, not just at lookup. A stranger, an ambiguous name and a 0-spot guest get the same
+  reply. Tests in `src/worker/rsvp.test.ts` guard this. Never commit the guest list.
 
 ## Working conventions
 
