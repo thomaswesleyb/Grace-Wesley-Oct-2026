@@ -89,6 +89,9 @@ describe("allowedTypos", () => {
   });
 });
 
+const asTyped = (guestId: string) => ({ guestId, exact: true });
+const toConfirm = (guestId: string) => ({ guestId, exact: false });
+
 describe("matchGuest", () => {
   const candidates: NameCandidate[] = [
     { guestId: "margaret", nameKey: nameKey("Margaret", "Parkhill") },
@@ -101,29 +104,30 @@ describe("matchGuest", () => {
   const find = (first: string, last: string) => matchGuest(typedKeys(first, last), candidates);
 
   it("matches exactly, ignoring case", () => {
-    expect(find("tom", "PARKHILL")).toBe("tom");
+    expect(find("tom", "PARKHILL")).toEqual(asTyped("tom"));
   });
 
   it("tolerates typos in longer names", () => {
-    expect(find("Margret", "Parkhil")).toBe("margaret");
+    expect(find("Margret", "Parkhil")).toEqual(toConfirm("margaret"));
   });
 
   it("does not guess for short names", () => {
     expect(find("Al", "Lu")).toBeNull();
   });
 
-  it("finds a guest by an alias", () => {
-    expect(find("Peggy", "Parkhill")).toBe("margaret");
+  it("treats an alias as an exact match", () => {
+    expect(find("Peggy", "Parkhill")).toEqual(asTyped("margaret"));
   });
 
-  it("finds a guest by a nickname from the table", () => {
-    expect(find("Bob", "Hughes")).toBe("robert");
-    expect(find("Thomas", "Parkhill")).toBe("tom");
+  it("finds a guest by a nickname from the table, as a match to confirm", () => {
+    expect(find("Bob", "Hughes")).toEqual(toConfirm("robert"));
+    expect(find("Thomas", "Parkhill")).toEqual(toConfirm("tom"));
+    expect(find("Bob", "Hughs")).toEqual(toConfirm("robert"));
   });
 
   it("matches a hyphenated last name typed with a space, joined, or alone", () => {
-    expect(find("Ann", "Smith Jones")).toBe("ann");
-    expect(find("Ann", "SmithJones")).toBe("ann");
+    expect(find("Ann", "Smith Jones")).toEqual(asTyped("ann"));
+    expect(find("Ann", "SmithJones")).toEqual(toConfirm("ann"));
   });
 
   it("returns null for empty input or no match", () => {
@@ -153,7 +157,15 @@ describe("matchGuest", () => {
       { guestId: "anne", nameKey: "anne miller" },
       { guestId: "ann", nameKey: "ann miller" },
     ];
-    expect(matchGuest(["ann miller"], list)).toBe("ann");
+    expect(matchGuest(["ann miller"], list)).toEqual({ guestId: "ann", exact: true });
+  });
+
+  it("prefers the name as typed over a nickname of another guest", () => {
+    const list = [
+      { guestId: "will", nameKey: "will reed" },
+      { guestId: "william", nameKey: "william reed" },
+    ];
+    expect(matchGuest(typedKeys("Will", "Reed"), list)).toEqual({ guestId: "will", exact: true });
   });
 
   it("always finds every guest by their exact name", () => {
@@ -165,7 +177,9 @@ describe("matchGuest", () => {
         }),
         (keys) => {
           const list = keys.map((key, i) => ({ guestId: `g${i}`, nameKey: key }));
-          for (const [i, key] of keys.entries()) expect(matchGuest([key], list)).toBe(`g${i}`);
+          for (const [i, key] of keys.entries()) {
+            expect(matchGuest([key], list)).toEqual({ guestId: `g${i}`, exact: true });
+          }
         },
       ),
     );

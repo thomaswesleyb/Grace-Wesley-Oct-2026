@@ -38,7 +38,9 @@ Guests find their own name on the guest list, then answer for up to their number
   alias.
 - Lookup ignores case, accents, punctuation and hyphens. It allows 1 typo in names of 8 to 13
   characters and 2 typos from 14, and knows common nicknames (`src/shared/nicknames.ts`). A name
-  that two guests match equally well is "not found" rather than a guess.
+  that two guests match equally well is "not found" rather than a guess. A typo or nickname match
+  first asks "Did you mean …?". "No" goes back to the search, with the contact address shown.
+  An exact name or alias goes straight to the form.
 - The server checks the guest and the party size on every submit. The listed guest is always
   saved under their name from the list. Lookups and submits share a limit of 10 a minute per IP
   address.

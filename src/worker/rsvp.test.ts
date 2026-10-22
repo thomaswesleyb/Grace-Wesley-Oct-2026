@@ -33,23 +33,24 @@ const person = (firstName: string, attending = true, dietary = "") => ({
 
 describe("POST /api/rsvp/lookup", () => {
   it.each([
-    ["the listed name", "Margaret", "Parkhill"],
-    ["any letter case and spacing", "  margaret ", "PARKHILL"],
-    ["a typo", "Margret", "Parkhil"],
-    ["an alias", "Peggy", "Parkhill"],
-  ])("finds a guest by %s", async (_how, first, last) => {
+    ["the listed name", "Margaret", "Parkhill", true],
+    ["any letter case and spacing", "  margaret ", "PARKHILL", true],
+    ["an alias", "Peggy", "Parkhill", true],
+    ["a typo, to confirm", "Margret", "Parkhil", false],
+  ])("finds a guest by %s", async (_how, first, last, exact) => {
     const response = await lookup(first, last);
     expect(response.status).toBe(200);
     expect(lookupResponse.parse(await response.json())).toEqual({
       found: true,
       guest: { id: "margaret", firstName: "Margaret", lastName: "Parkhill", spots: 2 },
+      exact,
       answered: false,
     });
   });
 
-  it("finds a guest by a common nickname", async () => {
+  it("finds a guest by a common nickname, to confirm", async () => {
     const body = lookupResponse.parse(await (await lookup("Bob", "Hughes")).json());
-    expect(body).toMatchObject({ found: true, guest: { id: "robert" } });
+    expect(body).toMatchObject({ found: true, guest: { id: "robert" }, exact: false });
   });
 
   it("gives a stranger, a guest with no places, and an ambiguous name the same reply", async () => {

@@ -23,15 +23,15 @@ Launch: **Friday, October 23, 2026**. Work top to bottom. Each step has:
 **Live:** the site at parkhillbaileywedding.com and www, the production database, Resend alerts,
 and Access on `/admin`. The Registry link is hidden.
 
-**Built Oct 22, not yet deployed:** the RSVP now works from the guest list instead of a shared
-code. Guests find their own name, and each can answer for up to their `total_guest_spots`.
-Production still runs the code version until the steps below are done.
+**Deployed Oct 22 (not yet committed):** the RSVP now works from the guest list instead of a
+shared code. Guests find their own name, and each can answer for up to their
+`total_guest_spots`. Production has migration 0005 and all 59 guests (94 places).
 
 **Left before invitations go out:**
 
-1. Review the guest list (step 5), then commit and push.
-2. Load the guest list and deploy (step 11).
-3. Smoke-test with a real name (step 12).
+1. Commit and push the guest-list RSVP work.
+2. Delete the old code secret (step 11).
+3. Smoke-test with a real name (step 12). Review the guest list (step 5) any time, then reseed.
 4. Optional: fill in `DETAILS.md` (step 3). Only 4 of 18 Q&A answers show.
 5. Install prek (step 1).
 
@@ -231,10 +231,11 @@ and it never drops a guest who has answered.
 
 **Why:** until the list is loaded, every name is "not found".
 
-> Prompt: **"Apply the migrations to production, seed the guest list remotely, and deploy."**
+> Done Oct 22: migrated, seeded (59 guests) and deployed. A made-up name says "not found", a
+> real one shows its places, and the old `/api/rsvp/unlock` route is gone.
 
 - [ ] Afterwards, delete the old code secret: `! pnpm exec wrangler secret delete RSVP_CODE`.
-- [ ] On the live RSVP page, a made-up name should say "not found", and a real one should show
+- [x] On the live RSVP page, a made-up name should say "not found", and a real one should show
       that guest's number of places.
 
 ### 12. Test a real RSVP end to end

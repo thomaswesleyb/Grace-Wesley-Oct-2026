@@ -58,8 +58,9 @@ accessibility); registry and other. Each entry appears only when its answer is i
 
 ## RSVP
 - Guests find their own name on the guest list (decided 2026-10-22, replacing the shared code
-  of 2026-10-21). Typos, aliases and common nicknames still match. A name that isn't found shows
-  the couple's contact address.
+  of 2026-10-21). Typos, aliases and common nicknames still match. A typo or nickname match asks
+  "Did you mean {listed name}?" first (decided 2026-10-22). A name that isn't found shows the
+  couple's contact address.
 - Each guest has a number of places (`total_guest_spots`). The form opens with the guest's own
   name locked, says how many places are saved, and lets them add people up to that number.
   Each person gets accept or decline and dietary needs, plus one email, song request and note.

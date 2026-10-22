@@ -39,9 +39,9 @@ rsvp.post("/lookup", async (c) => {
   if (!parsed.success) return c.json({ error: "Please enter your first and last name." }, 400);
 
   const typed = typedKeys(parsed.data.firstName, parsed.data.lastName);
-  const guestId = matchGuest(typed, await nameCandidates(c.env.DB));
-  const guest = guestId === null ? null : await getGuest(c.env.DB, guestId);
-  if (guest === null || guest.spots === 0) return c.json(NOT_FOUND);
+  const match = matchGuest(typed, await nameCandidates(c.env.DB));
+  const guest = match === null ? null : await getGuest(c.env.DB, match.guestId);
+  if (match === null || guest === null || guest.spots === 0) return c.json(NOT_FOUND);
   return c.json({
     found: true,
     guest: {
@@ -50,6 +50,7 @@ rsvp.post("/lookup", async (c) => {
       lastName: guest.last_name,
       spots: guest.spots,
     },
+    exact: match.exact,
     answered: await hasCurrentRsvp(c.env.DB, guest.id),
   } satisfies LookupResponse);
 });

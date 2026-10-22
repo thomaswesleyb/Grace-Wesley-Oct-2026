@@ -71,9 +71,24 @@ export interface NameCandidate {
   nameKey: string;
 }
 
+/** A guest a typed name matched, and whether it matched as typed or only approximately. */
+export interface GuestMatch {
+  guestId: string;
+  /**
+   * True when the typed name is the guest's listed name or one of their aliases, ignoring
+   * case, accents and punctuation. False for a typo or nickname match, which the guest should
+   * confirm.
+   */
+  exact: boolean;
+}
+
 /** The one guest among `ids`, or null when there are none or several. */
-function only(ids: Set<string>): string | null {
-  return ids.size === 1 ? [...ids][0]! : null;
+function only(ids: Set<string>, exact: boolean): GuestMatch | null {
+  return ids.size === 1 ? { guestId: [...ids][0]!, exact } : null;
+}
+
+function guestsWithKey(keys: Set<string>, candidates: NameCandidate[]): Set<string> {
+  return new Set(candidates.filter((c) => keys.has(c.nameKey)).map((c) => c.guestId));
 }
 
 function closestGuests(typed: string[], candidates: NameCandidate[]): Set<string> {
@@ -94,17 +109,19 @@ function closestGuests(typed: string[], candidates: NameCandidate[]): Set<string
 }
 
 /**
- * Finds the single guest a typed name belongs to. `typed` holds the typed key and its
+ * Finds the single guest a typed name belongs to. `typed` holds the typed key first, then its
  * nickname variants (see `typedKeys`).
  *
- * An exact match on any variant wins. Otherwise the closest key within the typo allowance wins,
- * but only if no other guest is equally close. An ambiguous match returns null rather than guess.
+ * The name as typed wins first, then a nickname variant, then the closest key within the typo
+ * allowance. At each stage, two guests matching equally well returns null rather than a guess.
  */
-export function matchGuest(typed: string[], candidates: NameCandidate[]): string | null {
+export function matchGuest(typed: string[], candidates: NameCandidate[]): GuestMatch | null {
   const keys = typed.filter((k) => k.length > 0);
-  if (keys.length === 0) return null;
-  const wanted = new Set(keys);
-  const exact = new Set(candidates.filter((c) => wanted.has(c.nameKey)).map((c) => c.guestId));
-  if (exact.size > 0) return only(exact);
-  return only(closestGuests(keys, candidates));
+  const [asTyped, ...variants] = keys;
+  if (asTyped === undefined) return null;
+  const exact = guestsWithKey(new Set([asTyped]), candidates);
+  if (exact.size > 0) return only(exact, true);
+  const nicknamed = guestsWithKey(new Set(variants), candidates);
+  if (nicknamed.size > 0) return only(nicknamed, false);
+  return only(closestGuests(keys, candidates), false);
 }

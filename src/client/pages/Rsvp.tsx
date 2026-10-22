@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { apiFetch, ApiRequestError } from "@client/api.ts";
 import {
+  ConfirmStep,
   DetailsStep,
   FindStep,
   DoneStep,
@@ -11,7 +12,7 @@ import { draftFor, toSubmission, type Draft } from "@client/pages/rsvp-state.ts"
 import { lookupResponse, rsvpResult, type ListedGuest, type RsvpResult } from "@shared/schemas.ts";
 import "@client/pages/rsvp.css";
 
-type Step = "find" | "respond" | "details" | "review" | "done";
+type Step = "find" | "confirm" | "respond" | "details" | "review" | "done";
 
 const STEP_LABELS: [Step, string][] = [
   ["respond", "Respond"],
@@ -41,6 +42,7 @@ function useRsvpFlow() {
   const [guest, setGuest] = useState<ListedGuest | null>(null);
   const [answered, setAnswered] = useState(false);
   const [notFound, setNotFound] = useState(false);
+  const [typed, setTyped] = useState({ firstName: "", lastName: "" });
   const [draft, setDraft] = useState<Draft | null>(null);
   const [result, setResult] = useState<RsvpResult | null>(null);
   const [busy, setBusy] = useState(false);
@@ -69,6 +71,7 @@ function useRsvpFlow() {
   const find = (firstName: string, lastName: string) =>
     run(async () => {
       setNotFound(false);
+      setTyped({ firstName, lastName });
       const reply = await apiFetch("/api/rsvp/lookup", lookupResponse, {
         method: "POST",
         body: { firstName, lastName },
@@ -80,8 +83,16 @@ function useRsvpFlow() {
       setGuest(reply.guest);
       setAnswered(reply.answered);
       setDraft(draftFor(reply.guest));
-      goTo("respond");
+      goTo(reply.exact ? "respond" : "confirm");
     });
+
+  /** The guest said the suggested name isn't theirs. */
+  const reject = () => {
+    setGuest(null);
+    setDraft(null);
+    setNotFound(true);
+    goTo("find");
+  };
 
   const submit = () =>
     run(async () => {
@@ -101,6 +112,7 @@ function useRsvpFlow() {
     guest,
     answered,
     notFound,
+    typed,
     draft,
     result,
     busy,
@@ -109,6 +121,7 @@ function useRsvpFlow() {
     setError,
     goTo,
     find,
+    reject,
     submit,
   };
 }
@@ -119,6 +132,7 @@ type Flow = ReturnType<typeof useRsvpFlow>;
 function GuestStep({ flow, guest, draft }: { flow: Flow; guest: ListedGuest; draft: Draft }) {
   switch (flow.step) {
     case "find":
+    case "confirm":
       return null;
     case "respond":
       return (
@@ -152,14 +166,19 @@ function GuestStep({ flow, guest, draft }: { flow: Flow; guest: ListedGuest; dra
 function StepBody({ flow }: { flow: Flow }) {
   const { guest, draft } = flow;
   if (flow.step === "find" || guest === null || draft === null) {
-    return <FindStep busy={flow.busy} notFound={flow.notFound} onFind={flow.find} />;
+    return (
+      <FindStep busy={flow.busy} notFound={flow.notFound} initial={flow.typed} onFind={flow.find} />
+    );
+  }
+  if (flow.step === "confirm") {
+    return <ConfirmStep guest={guest} onYes={() => flow.goTo("respond")} onNo={flow.reject} />;
   }
   return <GuestStep flow={flow} guest={guest} draft={draft} />;
 }
 
 export function Rsvp() {
   const flow = useRsvpFlow();
-  const showProgress = flow.step !== "find" && flow.step !== "done";
+  const showProgress = !["find", "confirm", "done"].includes(flow.step);
   return (
     <>
       <section className="page rsvp">

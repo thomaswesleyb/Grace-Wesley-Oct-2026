@@ -32,6 +32,11 @@ export const lookupResponse = z.discriminatedUnion("found", [
   z.object({
     found: z.literal(true),
     guest: listedGuest,
+    /**
+     * False when the name only matched through a typo or nickname, so the page asks
+     * "Did you mean …?" before going on.
+     */
+    exact: z.boolean(),
     /** True when this guest already has an RSVP; a new one replaces it. */
     answered: z.boolean(),
   }),

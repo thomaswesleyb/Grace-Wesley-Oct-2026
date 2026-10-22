@@ -18,12 +18,14 @@ const fullName = (p: { firstName: string; lastName: string }) =>
 interface FindProps {
   busy: boolean;
   notFound: boolean;
+  /** What the guest typed last time, so going back doesn't make them retype it. */
+  initial: { firstName: string; lastName: string };
   onFind: (firstName: string, lastName: string) => void;
 }
 
-export function FindStep({ busy, notFound, onFind }: FindProps) {
-  const [firstName, setFirstName] = useState("");
-  const [lastName, setLastName] = useState("");
+export function FindStep({ busy, notFound, initial, onFind }: FindProps) {
+  const [firstName, setFirstName] = useState(initial.firstName);
+  const [lastName, setLastName] = useState(initial.lastName);
   const submit = (event: FormEvent) => {
     event.preventDefault();
     onFind(firstName, lastName);
@@ -68,6 +70,32 @@ export function FindStep({ busy, notFound, onFind }: FindProps) {
         </button>
       </div>
     </form>
+  );
+}
+
+interface ConfirmProps {
+  guest: ListedGuest;
+  onYes: () => void;
+  onNo: () => void;
+}
+
+/** Shown when the typed name only matched through a typo or nickname. */
+export function ConfirmStep({ guest, onYes, onNo }: ConfirmProps) {
+  return (
+    <div className="panel">
+      <h2 className="rsvp-label">
+        Did you mean {guest.firstName} {guest.lastName}?
+      </h2>
+      <p className="rsvp-muted">That's the closest name on our guest list.</p>
+      <div className="actions">
+        <button className="button secondary" type="button" onClick={onNo}>
+          No, that's not me
+        </button>
+        <button className="button" type="button" onClick={onYes}>
+          Yes, that's me
+        </button>
+      </div>
+    </div>
   );
 }
 
