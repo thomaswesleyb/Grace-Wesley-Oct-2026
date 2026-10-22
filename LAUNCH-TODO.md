@@ -207,15 +207,16 @@ app. The site checks both on every admin request.
 Access is set up, the live admin page refuses to open at all. That's deliberate: it's locked
 rather than left exposed.
 
-- [ ] Cloudflare dashboard → **Zero Trust**. Pick a team name and the free plan (it may ask for
+- [x] Cloudflare dashboard → **Zero Trust**. Pick a team name and the free plan (it may ask for
       a card even on the free plan).
-- [ ] Access → Applications → **Add a self-hosted application** covering
+- [x] Access → Applications → **Add a self-hosted application** covering
       `parkhillbaileywedding.com/admin` and `parkhillbaileywedding.com/api/admin`. Policy: Allow,
       Emails = your two addresses.
-- [ ] Copy the **team domain** (`<team>.cloudflareaccess.com`) and the app's **Application
+- [x] Copy the **team domain** (`<team>.cloudflareaccess.com`) and the app's **Application
       Audience (AUD) tag**. Neither is secret.
 
-> Prompt: **"Access is set up. Team domain: <…>, AUD: <…>. Put them in the config."**
+> Done Oct 21: team `parkhillbailey`, admin at https://parkhillbaileywedding.com/admin. The AUD tag is
+> the 64-character `aud` value, not the 32-character application ID.
 
 ### 9. Decide whether the registry shows at launch
 

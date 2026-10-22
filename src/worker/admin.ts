@@ -2,7 +2,7 @@ import { Hono } from "hono";
 import { createMiddleware } from "hono/factory";
 import { createRemoteJWKSet, jwtVerify } from "jose";
 import type { AdminSummary } from "@shared/schemas.ts";
-import { listAdminRsvps, listPaidContributions } from "@worker/db.ts";
+import { deleteRsvp, listAdminRsvps, listPaidContributions } from "@worker/db.ts";
 import type { Env } from "@worker/env.ts";
 
 const jwksByTeam = new Map<string, ReturnType<typeof createRemoteJWKSet>>();
@@ -53,4 +53,13 @@ admin.get("/summary", async (c) => {
     rsvps,
     gifts,
   } satisfies AdminSummary);
+});
+
+admin.delete("/rsvps/:id", async (c) => {
+  const id = c.req.param("id");
+  if (!(await deleteRsvp(c.env.DB, id))) {
+    return c.json({ error: "That RSVP doesn't exist. It may already be deleted." }, 404);
+  }
+  console.log(`Admin deleted RSVP ${id}.`);
+  return c.json({ ok: true as const });
 });

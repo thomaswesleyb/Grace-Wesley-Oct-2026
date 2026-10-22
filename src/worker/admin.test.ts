@@ -1,3 +1,4 @@
+import { env as workerEnv } from "cloudflare:workers";
 import { beforeEach, describe, expect, it } from "vitest";
 import { adminSummary } from "@shared/schemas.ts";
 import { call, resetDb, rsvpBody } from "@worker/test-helpers.ts";
@@ -55,5 +56,55 @@ describe("GET /api/admin/summary", () => {
       { firstName: "Sam", lastName: "Lee", attending: true, dietary: "vegan" },
       { firstName: "Kim", lastName: "Lee", attending: false, dietary: null },
     ]);
+  });
+});
+
+describe("DELETE /api/admin/rsvps/:id", () => {
+  const asAdmin = { origin: "http://localhost:5173", env: { ADMIN_DEV_BYPASS: "1" } };
+
+  async function summary() {
+    return adminSummary.parse(await (await call("/api/admin/summary", asAdmin)).json());
+  }
+
+  it("deletes one RSVP and everyone on it, leaving the others", async () => {
+    await call("/api/rsvp", {
+      body: rsvpBody({
+        email: "remove@example.com",
+        people: [
+          { firstName: "Test", lastName: "Guest", attending: true },
+          { firstName: "Second", lastName: "Tester", attending: false },
+        ],
+      }),
+    });
+    await call("/api/rsvp", { body: rsvpBody({ email: "keep@example.com" }) });
+    const target = (await summary()).rsvps.find((r) => r.email === "remove@example.com");
+
+    const response = await call(`/api/admin/rsvps/${target?.id}`, { ...asAdmin, method: "DELETE" });
+    expect(response.status).toBe(200);
+    expect(await response.json()).toEqual({ ok: true });
+
+    const after = await summary();
+    expect(after.rsvps.map((r) => r.email)).toEqual(["keep@example.com"]);
+    expect(after.totals).toEqual({ rsvps: 1, attending: 1, declining: 0 });
+    const orphans = await workerEnv.DB.prepare(
+      "SELECT COUNT(*) AS n FROM rsvp_people WHERE rsvp_id = ?",
+    )
+      .bind(target?.id)
+      .first<{ n: number }>();
+    expect(orphans?.n).toBe(0);
+  });
+
+  it("returns 404 for an RSVP that doesn't exist", async () => {
+    const response = await call("/api/admin/rsvps/nope", { ...asAdmin, method: "DELETE" });
+    expect(response.status).toBe(404);
+  });
+
+  it("requires a signed-in admin", async () => {
+    await call("/api/rsvp", { body: rsvpBody() });
+    const [rsvp] = (await summary()).rsvps;
+    const env = { ACCESS_TEAM_DOMAIN: "team.cloudflareaccess.com", ACCESS_AUD: "aud" };
+    const response = await call(`/api/admin/rsvps/${rsvp?.id}`, { env, method: "DELETE" });
+    expect(response.status).toBe(401);
+    expect((await summary()).rsvps).toHaveLength(1);
   });
 });

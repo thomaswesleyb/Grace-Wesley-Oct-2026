@@ -1,8 +1,9 @@
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { apiFetch, ApiRequestError } from "@client/api.ts";
 import { formatDollars } from "@shared/registry.ts";
 import {
   adminSummary,
+  okResponse,
   type AdminContribution,
   type AdminRsvp,
   type AdminSummary,
@@ -70,7 +71,52 @@ function TotalTiles({ totals }: { totals: AdminSummary["totals"] }) {
   );
 }
 
-function RsvpRow({ rsvp }: { rsvp: AdminRsvp }) {
+interface RsvpRowProps {
+  rsvp: AdminRsvp;
+  busy: boolean;
+  onDelete: (rsvp: AdminRsvp) => void;
+}
+
+/** Two clicks to delete: "Delete" asks first, and only "Yes, delete" removes the RSVP. */
+function DeleteControl({ rsvp, busy, onDelete }: RsvpRowProps) {
+  const [confirming, setConfirming] = useState(false);
+  if (!confirming) {
+    return (
+      <button
+        className="button secondary admin-delete"
+        type="button"
+        disabled={busy}
+        onClick={() => setConfirming(true)}
+      >
+        Delete
+      </button>
+    );
+  }
+  return (
+    <div className="admin-confirm" role="group" aria-label="Confirm delete">
+      <span>Delete this RSVP?</span>
+      <button
+        className="button admin-delete"
+        type="button"
+        disabled={busy}
+        onClick={() => onDelete(rsvp)}
+      >
+        {busy ? "Deleting…" : "Yes, delete"}
+      </button>
+      <button
+        className="button secondary admin-delete"
+        type="button"
+        disabled={busy}
+        onClick={() => setConfirming(false)}
+      >
+        Cancel
+      </button>
+    </div>
+  );
+}
+
+function RsvpRow(props: RsvpRowProps) {
+  const { rsvp } = props;
   return (
     <tr>
       <td>{rsvp.createdAt.slice(0, 10)}</td>
@@ -85,6 +131,9 @@ function RsvpRow({ rsvp }: { rsvp: AdminRsvp }) {
       <td>{rsvp.email}</td>
       <td>{rsvp.songRequest ?? ""}</td>
       <td>{rsvp.note ?? ""}</td>
+      <td>
+        <DeleteControl {...props} />
+      </td>
     </tr>
   );
 }
@@ -130,17 +179,38 @@ function GiftsTable({ gifts }: { gifts: AdminContribution[] }) {
   );
 }
 
+const errorMessage = (e: unknown, fallback: string) =>
+  e instanceof ApiRequestError ? e.message : fallback;
+
 export function Admin() {
   const [summary, setSummary] = useState<AdminSummary | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [deleting, setDeleting] = useState(false);
+
+  const load = useCallback(
+    () =>
+      apiFetch("/api/admin/summary", adminSummary)
+        .then(setSummary)
+        .catch((e: unknown) => setError(errorMessage(e, "Couldn't load RSVPs."))),
+    [],
+  );
 
   useEffect(() => {
-    apiFetch("/api/admin/summary", adminSummary)
-      .then(setSummary)
-      .catch((e: unknown) =>
-        setError(e instanceof ApiRequestError ? e.message : "Couldn't load RSVPs."),
-      );
-  }, []);
+    void load();
+  }, [load]);
+
+  const remove = async (rsvp: AdminRsvp) => {
+    setDeleting(true);
+    setError(null);
+    try {
+      const path = `/api/admin/rsvps/${encodeURIComponent(rsvp.id)}`;
+      await apiFetch(path, okResponse, { method: "DELETE" });
+    } catch (e) {
+      setError(errorMessage(e, "Couldn't delete that RSVP."));
+    }
+    await load();
+    setDeleting(false);
+  };
 
   return (
     <section className="page admin">
@@ -167,11 +237,14 @@ export function Admin() {
                     <th>Email</th>
                     <th>Song</th>
                     <th>Note</th>
+                    <th>
+                      <span className="visually-hidden">Actions</span>
+                    </th>
                   </tr>
                 </thead>
                 <tbody>
                   {summary.rsvps.map((rsvp) => (
-                    <RsvpRow key={rsvp.id} rsvp={rsvp} />
+                    <RsvpRow key={rsvp.id} rsvp={rsvp} busy={deleting} onDelete={remove} />
                   ))}
                 </tbody>
               </table>

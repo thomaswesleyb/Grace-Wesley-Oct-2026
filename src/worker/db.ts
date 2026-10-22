@@ -45,6 +45,15 @@ export async function insertRsvp(
   ]);
 }
 
+/** Deletes one RSVP and everyone on it. Returns false when there's no RSVP with that id. */
+export async function deleteRsvp(db: D1Database, id: string): Promise<boolean> {
+  const results = await db.batch([
+    db.prepare("DELETE FROM rsvp_people WHERE rsvp_id = ?").bind(id),
+    db.prepare("DELETE FROM rsvps WHERE id = ?").bind(id),
+  ]);
+  return results.at(-1)?.meta.changes === 1;
+}
+
 interface RsvpRow {
   id: string;
   email: string;

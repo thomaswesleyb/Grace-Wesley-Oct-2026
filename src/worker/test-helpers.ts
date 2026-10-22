@@ -36,11 +36,13 @@ export async function call(
     headers?: Record<string, string>;
     env?: Partial<Env>;
     origin?: string;
+    /** Defaults to POST with a body, GET without. */
+    method?: string;
   } = {},
 ): Promise<Response> {
   ipCounter += 1;
   const init: RequestInit = {
-    method: options.body === undefined ? "GET" : "POST",
+    method: options.method ?? (options.body === undefined ? "GET" : "POST"),
     headers: {
       "cf-connecting-ip": `10.0.0.${ipCounter % 250}`,
       "content-type": "application/json",

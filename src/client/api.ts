@@ -10,7 +10,9 @@ export class ApiRequestError extends Error {
   }
 }
 
-async function send(path: string, method: "GET" | "POST", body: unknown): Promise<Response> {
+type Method = "GET" | "POST" | "DELETE";
+
+async function send(path: string, method: Method, body: unknown): Promise<Response> {
   try {
     const init: RequestInit =
       body === undefined
@@ -29,7 +31,7 @@ async function send(path: string, method: "GET" | "POST", body: unknown): Promis
 export async function apiFetch<T extends z.ZodType>(
   path: string,
   schema: T,
-  init: { method?: "GET" | "POST"; body?: unknown } = {},
+  init: { method?: Method; body?: unknown } = {},
 ): Promise<z.infer<T>> {
   const response = await send(path, init.method ?? "GET", init.body);
   const payload: unknown = await response.json().catch(() => null);

@@ -29,8 +29,8 @@
     },
   ],
   "vars": {
-    "ACCESS_TEAM_DOMAIN": "",
-    "ACCESS_AUD": "",
+    "ACCESS_TEAM_DOMAIN": "parkhillbailey.cloudflareaccess.com",
+    "ACCESS_AUD": "51a27e8a028bb5757fb6806b0d01a5173fc8777027f401e4cbbd9ce73119e214",
     "ALERT_TO": "parkhill.bailey.wedding@gmail.com",
     "ALERT_FROM": "RSVP <rsvp@parkhillbaileywedding.com>",
   },

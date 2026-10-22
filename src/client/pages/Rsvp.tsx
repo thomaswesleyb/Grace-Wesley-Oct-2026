@@ -8,7 +8,7 @@ import {
   ReviewStep,
 } from "@client/pages/RsvpSteps.tsx";
 import { emptyDraft, toSubmission, type Draft } from "@client/pages/rsvp-state.ts";
-import { rsvpResult, unlockResponse, type RsvpResult } from "@shared/schemas.ts";
+import { rsvpResult, okResponse, type RsvpResult } from "@shared/schemas.ts";
 import "@client/pages/rsvp.css";
 
 type Step = "code" | "respond" | "details" | "review" | "done";
@@ -66,7 +66,7 @@ function useRsvpFlow() {
 
   const unlock = (typed: string) =>
     run(async () => {
-      await apiFetch("/api/rsvp/unlock", unlockResponse, {
+      await apiFetch("/api/rsvp/unlock", okResponse, {
         method: "POST",
         body: { code: typed },
       });

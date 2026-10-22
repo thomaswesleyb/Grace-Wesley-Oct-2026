@@ -55,6 +55,21 @@
   white-space: nowrap;
 }
 
+.admin-delete {
+  min-height: 2.25rem;
+  padding: 0.3rem 0.8rem;
+  font-size: 0.85rem;
+  white-space: nowrap;
+}
+
+.admin-confirm {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.4rem;
+  min-width: 12rem;
+}
+
 .admin-gifts {
   margin-top: 2.5rem;
 }

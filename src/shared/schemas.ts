@@ -16,7 +16,7 @@ export const MAX_PARTY = 6;
 const rsvpCode = z.string().max(40);
 
 export const unlockRequest = z.object({ code: rsvpCode });
-export const unlockResponse = z.object({ ok: z.literal(true) });
+export const okResponse = z.object({ ok: z.literal(true) });
 
 export const rsvpPerson = z.object({
   firstName: personName,
