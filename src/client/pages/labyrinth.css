@@ -3,6 +3,7 @@
   --brick: #a2503a;
   --fox: #c4703c;
   --deer: #a88b6a;
+  --gold: #d9b45a;
 }
 
 .labyrinth-start p {
@@ -69,12 +70,92 @@
 .labyrinth-walls {
   fill: none;
   stroke: var(--brick);
+  /* WALL_HALF_WIDTH in labyrinth/physics.ts is half of this; change both together. */
   stroke-width: 0.18;
   stroke-linecap: round;
 }
 
+/* Fallen leaves on the floor, in autumn rust, amber, ochre and oxblood. */
+.labyrinth-leaf {
+  opacity: 0.85;
+}
+
+.labyrinth-leaf.tint-0 .leaf-blade {
+  fill: #a4492b;
+}
+
+.labyrinth-leaf.tint-1 .leaf-blade {
+  fill: #c4852f;
+}
+
+.labyrinth-leaf.tint-2 .leaf-blade {
+  fill: #b06a2c;
+}
+
+.labyrinth-leaf.tint-3 .leaf-blade {
+  fill: #7f3424;
+}
+
+.leaf-vein {
+  fill: none;
+  stroke: var(--espresso-900);
+  stroke-width: 0.018;
+  stroke-linecap: round;
+  opacity: 0.6;
+}
+
+/* The gate across the center's doorway: gold bars, the same thickness as the walls. */
+.labyrinth-gate {
+  fill: none;
+  stroke: var(--gold);
+  stroke-width: 0.18;
+  stroke-dasharray: 0.07 0.05;
+}
+
+.labyrinth-wedding-ring .ring-band {
+  fill: none;
+  stroke: var(--gold);
+  stroke-width: 0.06;
+}
+
+.labyrinth-wedding-ring .ring-gem {
+  fill: var(--cream-50);
+  stroke: var(--gold);
+  stroke-width: 0.02;
+}
+
+.labyrinth-wedding-ring .ring-glow {
+  fill: var(--gold);
+  opacity: 0.2;
+  animation: ring-glow 1.6s ease-in-out infinite alternate;
+}
+
+@keyframes ring-glow {
+  to {
+    opacity: 0.45;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .labyrinth-wedding-ring .ring-glow {
+    animation: none;
+  }
+}
+
 .labyrinth-player {
-  transition: transform 140ms ease-out;
+  cursor: grab;
+}
+
+.labyrinth-player.arrived {
+  transition: transform 300ms ease-out;
+}
+
+.labyrinth-board.dragging {
+  cursor: grabbing;
+}
+
+.labyrinth-board.dragging .labyrinth-player {
+  cursor: grabbing;
 }
 
 .labyrinth-heart {
@@ -116,50 +197,6 @@
   min-height: 1.6em;
   margin: 0.75rem 0 0.5rem;
   color: var(--sepia-300);
-}
-
-/* On-screen arrows in a plus shape, for touch and for anyone not using a keyboard. */
-.labyrinth-pad {
-  display: grid;
-  grid-template:
-    ". up ." 3rem
-    "left . right" 3rem
-    ". down ." 3rem / 3rem 3rem 3rem;
-  gap: 0.25rem;
-  justify-content: center;
-  margin-top: 0.5rem;
-}
-
-.labyrinth-arrow {
-  font:
-    1.25rem/1 system-ui,
-    sans-serif;
-  color: var(--cream-100);
-  background: rgb(31 22 16 / 0.55);
-  border: 1px solid rgb(168 139 106 / 0.45);
-  border-radius: var(--radius);
-  cursor: pointer;
-  touch-action: manipulation;
-}
-
-.labyrinth-arrow:active {
-  background: rgb(239 230 214 / 0.12);
-}
-
-.labyrinth-arrow-up {
-  grid-area: up;
-}
-
-.labyrinth-arrow-down {
-  grid-area: down;
-}
-
-.labyrinth-arrow-left {
-  grid-area: left;
-}
-
-.labyrinth-arrow-right {
-  grid-area: right;
 }
 
 .labyrinth-hint {

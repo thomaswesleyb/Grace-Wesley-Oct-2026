@@ -10,14 +10,18 @@ export class ApiRequestError extends Error {
   }
 }
 
-type Method = "GET" | "POST" | "DELETE";
+type Method = "GET" | "POST" | "PATCH" | "DELETE";
+
+/** A FormData body is sent as a multipart upload; anything else as JSON. */
+function requestInit(method: Method, body: unknown): RequestInit {
+  if (body === undefined) return { method };
+  if (body instanceof FormData) return { method, body };
+  return { method, headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) };
+}
 
 async function send(path: string, method: Method, body: unknown): Promise<Response> {
   try {
-    const init: RequestInit =
-      body === undefined
-        ? { method }
-        : { method, headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) };
+    const init = requestInit(method, body);
     return await fetch(path, init);
   } catch {
     throw new ApiRequestError(

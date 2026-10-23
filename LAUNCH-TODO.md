@@ -97,26 +97,25 @@ answers first.
 
 ### 4. Add your photos
 
-**What it is:** the Photos page shows your engagement photos and any other pictures you pick.
-*ImageMagick* (already installed) makes small, fast-loading WebP copies of each photo for the
-site. Your originals are never changed.
+**What it is:** the Photos page shows your engagement photos and any other pictures you add.
+*R2* is Cloudflare's file storage (free up to 10 GB); the photos live there, so adding one
+needs no deploy. You add them by dragging them onto `/admin/photos`.
 
-**Why:** the page says "Photos coming soon" until there are photos. Every photo in `images/`
-is shown automatically, and `pnpm dev` and `pnpm build` refresh the gallery. Captions and alt
-text come only from you. Alt text is a short description of each photo that screen readers read
-aloud to guests who can't see it. Photos you haven't described are read as "Photo 12 of 32".
+**Why:** the page says "Photos coming soon" until there are photos. Captions and alt text come
+only from you. Alt text is a short description of each photo that screen readers read aloud to
+guests who can't see it. Photos you haven't described are read as "Photo 12 of 32".
 
-- [x] Put the originals in `images/` (JPEG, PNG, WebP, or iPhone HEIC). 32 are in.
-- [ ] Optional: in `images/captions.csv` (columns `file,caption,alt`), add a row for any photo
-      you want to caption, describe, or move to the front. Listed photos come first, in the
-      CSV's order. The rest follow by file name.
-- [ ] Decide whether to commit the originals (307 MB for the 24 new ones). The site only needs
-      the generated copies in `public/photos/gallery/` (14 MB) and `content/gallery.json`. The
-      copies have location data removed. `IMG_7865.JPG`'s original still has GPS coordinates,
-      and the repo is public.
+- [x] Pick the photos. 20 are on the site today (built in, from `images/`).
+- [ ] Move them to R2 (one time): `! pnpm exec wrangler r2 bucket create wedding-photos`, then
+      `! pnpm db:migrate:remote`, `! pnpm photos:import --remote`, and `! pnpm deploy`.
+- [ ] After that, `content/gallery.json`, `public/photos/gallery/`, `scripts/import-gallery.ts`
+      and its `photos:import` script can be deleted. `images/` isn't used by the site any more.
+- [ ] Optional: add captions and descriptions on `/admin/photos`.
 - [ ] Optional: add `Photos intro: …` and `Labyrinth intro: …` to `DETAILS.md`.
+- [ ] After the wedding: press "Open guest sharing" on `/admin/photos`, and approve guests'
+      photos there as they arrive.
 
-> Prompt: **"Photos are in. Build the gallery copies and show me the page."**
+> Prompt: **"Move the photos to R2 and deploy."**
 
 ### 5. Review the guest list
 

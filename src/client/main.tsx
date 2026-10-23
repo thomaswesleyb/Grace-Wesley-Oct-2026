@@ -3,6 +3,8 @@ import { createRoot } from "react-dom/client";
 import { createBrowserRouter, RouterProvider } from "react-router";
 import { Layout } from "@client/components/Layout.tsx";
 import { Admin } from "@client/pages/Admin.tsx";
+import { AdminPhotos } from "@client/pages/AdminPhotos.tsx";
+import { AdminQuestions } from "@client/pages/AdminQuestions.tsx";
 import { Home } from "@client/pages/Home.tsx";
 import { Labyrinth } from "@client/pages/Labyrinth.tsx";
 import { NotFound } from "@client/pages/NotFound.tsx";
@@ -26,6 +28,8 @@ const router = createBrowserRouter([
       { path: "/labyrinth", element: <Labyrinth /> },
       { path: "/registry", element: <Registry /> },
       { path: "/admin", element: <Admin /> },
+      { path: "/admin/photos", element: <AdminPhotos /> },
+      { path: "/admin/questions", element: <AdminQuestions /> },
       { path: "*", element: <NotFound /> },
     ],
   },

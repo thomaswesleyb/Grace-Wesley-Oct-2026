@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useState } from "react";
+import { Link } from "react-router";
 import { apiFetch, ApiRequestError } from "@client/api.ts";
 import { formatDollars } from "@shared/registry.ts";
 import {
@@ -281,6 +282,10 @@ export function Admin() {
   return (
     <section className="page admin">
       <h1>RSVPs</h1>
+      <p className="admin-nav">
+        <Link to="/admin/photos">Manage photos →</Link> ·{" "}
+        <Link to="/admin/questions">Manage Q&amp;A →</Link>
+      </p>
       {error !== null && <p className="notice error">{error}</p>}
       {summary === null && error === null && <p className="lede">Loading…</p>}
       {summary !== null && (

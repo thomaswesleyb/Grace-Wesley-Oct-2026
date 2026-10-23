@@ -6,6 +6,8 @@ import type { Env } from "@worker/env.ts";
 
 export async function resetDb(): Promise<void> {
   await env.DB.batch([
+    env.DB.prepare("DELETE FROM photos"),
+    env.DB.prepare("DELETE FROM questions"),
     env.DB.prepare("DELETE FROM contributions"),
     env.DB.prepare("DELETE FROM registry_items"),
     env.DB.prepare("DELETE FROM rsvp_people"),
@@ -13,7 +15,10 @@ export async function resetDb(): Promise<void> {
     env.DB.prepare("DELETE FROM guest_aliases"),
     env.DB.prepare("DELETE FROM guests"),
     env.DB.prepare("UPDATE settings SET value = '1' WHERE key = 'rsvp_open'"),
+    env.DB.prepare("UPDATE settings SET value = '0' WHERE key = 'photo_uploads_open'"),
   ]);
+  const { objects } = await env.PHOTOS.list();
+  if (objects.length > 0) await env.PHOTOS.delete(objects.map((o) => o.key));
 }
 
 /** Adds one guest to the guest list, with optional alias keys. */
@@ -46,10 +51,19 @@ export function rsvpBody(overrides: Record<string, unknown> = {}) {
 
 let ipCounter = 0;
 
+/** A FormData or string body is sent as is; anything else as JSON. */
+function encodeBody(body: unknown): { body?: BodyInit; headers: Record<string, string> } {
+  if (body === undefined) return { headers: { "content-type": "application/json" } };
+  if (body instanceof FormData) return { body, headers: {} };
+  const json = typeof body === "string" ? body : JSON.stringify(body);
+  return { body: json, headers: { "content-type": "application/json" } };
+}
+
 /** Calls the API with a fresh client IP each time so tests don't share a rate-limit bucket. */
 export async function call(
   path: string,
   options: {
+    /** A FormData body is sent as multipart; anything else as JSON. */
     body?: unknown;
     headers?: Record<string, string>;
     env?: Partial<Env>;
@@ -59,16 +73,16 @@ export async function call(
   } = {},
 ): Promise<Response> {
   ipCounter += 1;
+  const encoded = encodeBody(options.body);
   const init: RequestInit = {
     method: options.method ?? (options.body === undefined ? "GET" : "POST"),
     headers: {
       "cf-connecting-ip": `10.0.0.${ipCounter % 250}`,
-      "content-type": "application/json",
+      ...encoded.headers,
       ...options.headers,
     },
   };
-  if (options.body !== undefined)
-    init.body = typeof options.body === "string" ? options.body : JSON.stringify(options.body);
+  if (encoded.body !== undefined) init.body = encoded.body;
   const ctx = createExecutionContext();
   const response = await app.request(
     `${options.origin ?? "https://wedding.test"}${path}`,
