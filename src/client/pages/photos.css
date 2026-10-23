@@ -159,3 +159,17 @@
   margin: 0 0 0.5rem;
   text-align: center;
 }
+
+.link-button {
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--sepia-300);
+  font: inherit;
+  text-decoration: underline;
+  cursor: pointer;
+}
+
+.link-button:hover {
+  color: var(--cream-50);
+}

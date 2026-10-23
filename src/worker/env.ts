@@ -6,6 +6,8 @@ export interface Env {
   RSVP_LIMITER: RateLimit;
   /** Per-IP limit on guests' photo uploads. */
   PHOTO_LIMITER: RateLimit;
+  /** Per-guest limit on saving labyrinth times. */
+  LABYRINTH_LIMITER: RateLimit;
   /** Cloudflare Access team domain, e.g. "parkhillbailey.cloudflareaccess.com". */
   ACCESS_TEAM_DOMAIN: string;
   /** Cloudflare Access application audience (AUD) tag for /admin. */

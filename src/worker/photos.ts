@@ -38,6 +38,7 @@ import {
   type PhotoRow,
 } from "@worker/db.ts";
 import type { Env } from "@worker/env.ts";
+import { sessionGuest } from "@worker/session.ts";
 
 type AppContext = Context<{ Bindings: Env }>;
 
@@ -215,10 +216,20 @@ photos.get("/", async (c) => {
 const NOT_ON_LIST =
   "We couldn't find that name on our guest list. Please enter it as it's written on your invitation.";
 
-/** The guest a typed name belongs to, or null for a stranger, an ambiguous name or 0 places. */
-async function findUploader(db: D1Database, firstName: string, lastName: string) {
-  const match = matchGuest(typedKeys(firstName, lastName), await nameCandidates(db));
-  const guest = match === null ? null : await getGuest(db, match.guestId);
+/**
+ * The guest whose session came with the upload, else the guest the typed name belongs to. Null
+ * for a stranger, an ambiguous name or 0 places.
+ */
+async function findUploader(
+  c: AppContext,
+  fields: { firstName?: string | undefined; lastName?: string | undefined },
+) {
+  const signedIn = await sessionGuest(c);
+  if (signedIn !== null) return signedIn;
+  if (fields.firstName === undefined || fields.lastName === undefined) return null;
+  const typed = typedKeys(fields.firstName, fields.lastName);
+  const match = matchGuest(typed, await nameCandidates(c.env.DB));
+  const guest = match === null ? null : await getGuest(c.env.DB, match.guestId);
   return guest === null || guest.spots === 0 ? null : guest;
 }
 
@@ -242,7 +253,7 @@ photos.post("/", async (c) => {
   if (!upload.ok) return c.json({ error: upload.error }, 400);
 
   const { fields } = upload;
-  const guest = await findUploader(c.env.DB, fields.firstName, fields.lastName);
+  const guest = await findUploader(c, fields);
   if (guest === null) return c.json({ error: NOT_ON_LIST }, 403);
 
   const row: Omit<PhotoRow, "bytes"> = {

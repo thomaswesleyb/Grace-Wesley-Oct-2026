@@ -421,3 +421,69 @@ export async function deleteQuestion(db: D1Database, id: string): Promise<boolea
   const result = await db.prepare("DELETE FROM questions WHERE id = ?").bind(id).run();
   return result.meta.changes === 1;
 }
+
+export async function insertSession(
+  db: D1Database,
+  session: { tokenHash: string; guestId: string; createdAt: string; expiresAt: string },
+): Promise<void> {
+  await db
+    .prepare(
+      "INSERT INTO sessions (token_hash, guest_id, created_at, expires_at) VALUES (?, ?, ?, ?)",
+    )
+    .bind(session.tokenHash, session.guestId, session.createdAt, session.expiresAt)
+    .run();
+}
+
+/** The guest an unexpired session belongs to, or null, also when they no longer have places. */
+export async function getSessionGuest(
+  db: D1Database,
+  tokenHash: string,
+  now: string,
+): Promise<GuestRow | null> {
+  return db
+    .prepare(
+      `SELECT g.id, g.first_name, g.last_name, g.spots FROM sessions s
+       JOIN guests g ON g.id = s.guest_id
+       WHERE s.token_hash = ? AND s.expires_at > ? AND g.spots > 0`,
+    )
+    .bind(tokenHash, now)
+    .first<GuestRow>();
+}
+
+export async function deleteSession(db: D1Database, tokenHash: string): Promise<void> {
+  await db.prepare("DELETE FROM sessions WHERE token_hash = ?").bind(tokenHash).run();
+}
+
+export async function insertLabyrinthRun(
+  db: D1Database,
+  run: { id: string; guestId: string; animal: string; durationMs: number; finishedAt: string },
+): Promise<void> {
+  await db
+    .prepare(
+      `INSERT INTO labyrinth_runs (id, guest_id, animal, duration_ms, finished_at)
+       VALUES (?, ?, ?, ?, ?)`,
+    )
+    .bind(run.id, run.guestId, run.animal, run.durationMs, run.finishedAt)
+    .run();
+}
+
+export interface BestRunRow {
+  guest_id: string;
+  first_name: string;
+  last_name: string;
+  duration_ms: number;
+}
+
+/** Each guest's fastest walk, fastest first, leaving out guests who no longer have places. */
+export async function listBestRuns(db: D1Database): Promise<BestRunRow[]> {
+  const { results } = await db
+    .prepare(
+      `SELECT g.id AS guest_id, g.first_name, g.last_name, MIN(r.duration_ms) AS duration_ms
+       FROM labyrinth_runs r JOIN guests g ON g.id = r.guest_id
+       WHERE g.spots > 0
+       GROUP BY g.id
+       ORDER BY duration_ms, g.first_name, g.last_name`,
+    )
+    .all<BestRunRow>();
+  return results;
+}

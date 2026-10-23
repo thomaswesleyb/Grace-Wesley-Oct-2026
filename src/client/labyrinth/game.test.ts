@@ -38,10 +38,12 @@ describe("walk", () => {
         const game = startGame("deer", seed, START);
         const atRing = walkRoute(game, game.maze.weddingRing);
         expect(atRing.hasRing).toBe(true);
+        expect(atRing.finishedAt).toBeNull();
         expect(atRing.message).toBe("You found the ring. Now take it to the fox.");
         const done = walkRoute(atRing, CENTER, START + 42_000);
         expect(done.won).toBe(true);
         expect(done.message).toBe("You brought the ring to the fox in 42 seconds.");
+        expect(done.finishedAt).toBe(START + 42_000);
       }),
       { numRuns: 15 },
     );
