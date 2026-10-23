@@ -47,7 +47,7 @@ Match the site to the invitation's look:
 
 - **Palette:** dark sepia/espresso brown backgrounds, cream/ivory text, warm photo tint
 - **Type:** small-caps serif for names and body text (Playfair Display SC style); blackletter
-  (Old English/Fraktur style) for the date and time only
+  (Old English/Fraktur style) for the "and" between the names, the date and time, and the venue
 - **Ornament:** engraved filigree corner pieces and lattice side borders, in a vintage-formal
   style
 - **Pages:** Home (invitation), Q&A (includes travel and lodging), RSVP, Photos (engagement and

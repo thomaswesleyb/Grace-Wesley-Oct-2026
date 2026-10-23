@@ -7,67 +7,74 @@
 }
 
 /*
- * The card reproduces the printed invitation (778 × 1088 px). Every size and offset below is
- * that invitation's pixel measurement divided by 7.78, in cqw (1% of the card's width), so the
- * layout scales exactly like the print at any screen size.
+ * The card reproduces the printed invitation (758 × 1064 px with its border). Every size and
+ * offset below is that invitation's pixel measurement divided by 7.58, in cqw (1% of the card's
+ * width), so the layout scales exactly like the print at any screen size.
  */
 .invitation {
   --ink: rgb(230 221 215);
   position: relative;
   container-type: inline-size;
-  width: min(100%, 44rem, calc((100dvh - 8rem) * 778 / 1088));
+  width: min(100%, 44rem, calc((100dvh - 8rem) * 758 / 1064));
   min-width: min(100%, 20rem);
-  aspect-ratio: 778 / 1088;
+  aspect-ratio: 758 / 1064;
   overflow: hidden;
   color: var(--ink);
   background: rgb(35 20 4);
   box-shadow: 0 30px 80px rgb(0 0 0 / 0.5);
 }
 
-.inv-photo {
+.invitation::after {
+  content: "";
   position: absolute;
   inset: 0;
-  width: 100%;
-  height: 100%;
+  border: 1.45cqw solid rgb(222 217 214);
+  pointer-events: none;
+}
+
+.inv-photo {
+  position: absolute;
+  top: -1.19cqw;
+  left: -2.24cqw;
+  width: 115.57cqw;
+  height: auto;
   max-width: none;
-  object-fit: cover;
-  object-position: 50% 30%;
 }
 
 .inv-lattice {
   position: absolute;
-  top: 7.33cqw;
-  width: 5.01cqw;
-  height: 124.81cqw;
+  top: 6.2cqw;
+  width: 5.15cqw;
+  height: 128.1cqw;
   clip-path: inset(0 0 100% 0);
   animation: draw-down 1.4s cubic-bezier(0.65, 0, 0.35, 1) 0.15s forwards;
 }
 
 .inv-lattice-left {
-  left: 6.04cqw;
+  left: 7.12cqw;
   transform: scaleX(-1);
 }
 
 .inv-lattice-right {
-  left: 88.95cqw;
+  left: 87.47cqw;
 }
 
 .inv-filigree {
   position: absolute;
-  left: 19.92cqw;
-  width: 60.41cqw;
+  left: 23.83cqw;
+  width: 52.5cqw;
   height: auto;
   opacity: 0;
   animation: unfurl 1.1s ease-out 0.35s forwards;
 }
 
 .inv-filigree-top {
-  top: 1.03cqw;
+  top: 3.83cqw;
   transform-origin: 50% 0;
 }
 
 .inv-filigree-bottom {
-  bottom: 1.03cqw;
+  bottom: 4.49cqw;
   transform: scaleY(-1);
   transform-origin: 50% 50%;
   animation-name: unfurl-flipped;
@@ -101,76 +108,79 @@
 }
 
 .inv-name-1,
-.inv-and,
 .inv-name-2 {
-  font-size: 5.19cqw;
+  font-size: 5.33cqw;
   font-weight: 700;
 }
 
 .inv-name-1 {
-  top: 24.07cqw;
+  top: 23.39cqw;
 }
 
 .inv-and {
-  top: 32.89cqw;
+  top: 32.63cqw;
+  font-size: 5.84cqw;
 }
 
 .inv-name-2 {
-  top: 41.63cqw;
+  top: 41.41cqw;
 }
 
 .inv-invite .inv-line {
-  font-size: 4.05cqw;
+  font-size: 4.16cqw;
 }
 
 .inv-invite-1 {
-  top: 50.48cqw;
+  top: 50.23cqw;
 }
 
 .inv-invite-2 {
-  top: 55.73cqw;
+  top: 55.88cqw;
 }
 
 .inv-invite-3 {
-  top: 61.52cqw;
+  top: 61.82cqw;
 }
 
+.inv-and,
 .inv-date,
-.inv-time {
+.inv-time,
+.inv-venue,
+.inv-city {
   font-family: var(--blackletter);
 }
 
 .inv-date {
-  top: 69.88cqw;
-  font-size: 7.43cqw;
+  top: 72.78cqw;
+  font-size: 7.73cqw;
 }
 
 .inv-time {
-  top: 78.79cqw;
-  font-size: 6.41cqw;
+  top: 80.71cqw;
+  font-size: 7.11cqw;
 }
 
 .inv-venue,
-.inv-city,
-.inv-rsvp {
-  font-size: 4cqw;
+.inv-city {
+  font-size: 3.85cqw;
 }
 
 .inv-venue {
-  top: 89.99cqw;
+  top: 91.42cqw;
 }
 
 .inv-city {
-  top: 95.39cqw;
+  top: 97.1cqw;
 }
 
 .inv-rsvp {
-  top: 103.61cqw;
+  top: 105.29cqw;
+  font-size: 4.11cqw;
 }
 
 .inv-site {
-  top: 110.5cqw;
-  font-size: 3.25cqw;
+  top: 112.1cqw;
+  font-size: 3.34cqw;
 }
 
 .inv-where a,
