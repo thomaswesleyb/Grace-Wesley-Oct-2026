@@ -94,6 +94,15 @@ function useRsvpFlow() {
     goTo("find");
   };
 
+  /** Nothing has been sent yet, so this only clears the form for the next guest. */
+  const cancel = () => {
+    setGuest(null);
+    setDraft(null);
+    setNotFound(false);
+    setTyped({ firstName: "", lastName: "" });
+    goTo("find");
+  };
+
   const submit = () =>
     run(async () => {
       if (guest === null || draft === null) return;
@@ -122,6 +131,7 @@ function useRsvpFlow() {
     goTo,
     find,
     reject,
+    cancel,
     submit,
   };
 }
@@ -142,6 +152,7 @@ function GuestStep({ flow, guest, draft }: { flow: Flow; guest: ListedGuest; dra
           draft={draft}
           onChange={flow.updateDraft}
           onNext={() => flow.goTo("details")}
+          onCancel={flow.cancel}
           onError={flow.setError}
         />
       );

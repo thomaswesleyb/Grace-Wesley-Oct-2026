@@ -19,11 +19,13 @@ export type FactLabel =
   | "Guest arrival time"
   | "Dress code"
   | "Children policy"
+  | "Welcome statement"
   | "Plus-one policy"
   | "Indoor or outdoor"
   | "Accessibility"
   | "Photo policy"
-  | "Things to do nearby";
+  | "Things to do nearby"
+  | "Places to eat";
 
 /** Q&A page sections, in page order. */
 export const TOPICS = ["Getting there", "Lodging", "The day of", "Registry & more"] as const;
@@ -113,6 +115,12 @@ export const QA_ENTRIES: QaEntry[] = [
   },
   {
     topic: "The day of",
+    question: "Who will be celebrating with you?",
+    requires: ["Welcome statement"],
+    answer: passthrough("Welcome statement"),
+  },
+  {
+    topic: "The day of",
     question: "May I bring a guest?",
     requires: ["Plus-one policy"],
     answer: passthrough("Plus-one policy"),
@@ -154,6 +162,12 @@ export const QA_ENTRIES: QaEntry[] = [
     question: "What is there to do nearby?",
     requires: ["Things to do nearby"],
     answer: passthrough("Things to do nearby"),
+  },
+  {
+    topic: "Registry & more",
+    question: "Where should we eat?",
+    requires: ["Places to eat"],
+    answer: passthrough("Places to eat"),
   },
   {
     topic: "Registry & more",

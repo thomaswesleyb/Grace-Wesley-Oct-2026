@@ -84,8 +84,10 @@ Hotel room block: {{ HOTEL_ROOM_BLOCK }}
 Guest arrival time: {{ GUEST_ARRIVAL_TIME }}
 Dress code: {{ DRESS_CODE }}
 Children policy: {{ CHILDREN_POLICY }}
+Welcome statement: {{ WELCOME_STATEMENT }}
 Plus-one policy: {{ PLUS_ONE_POLICY }}
 Indoor or outdoor: {{ INDOOR_OR_OUTDOOR }}
 Accessibility: {{ ACCESSIBILITY }}
 Photo policy: {{ PHOTO_POLICY }}
 Things to do nearby: {{ THINGS_TO_DO }}
+Places to eat: {{ PLACES_TO_EAT }}

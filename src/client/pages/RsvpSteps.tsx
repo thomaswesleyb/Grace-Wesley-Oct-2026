@@ -195,8 +195,12 @@ interface RespondProps {
   draft: Draft;
   onChange: (draft: Draft) => void;
   onNext: () => void;
+  /** Drops this unsent RSVP and goes back to the name lookup. */
+  onCancel: () => void;
   onError: (message: string) => void;
 }
+
+const placesLeft = (left: number) => (left === 1 ? "1 place left" : `${left} places left`);
 
 function placesLine(spots: number): string {
   if (spots === 1) return "We've saved a place for you.";
@@ -205,7 +209,7 @@ function placesLine(spots: number): string {
 }
 
 export function RespondStep(props: RespondProps) {
-  const { guest, answered, draft, onChange, onNext, onError } = props;
+  const { guest, answered, draft, onChange, onNext, onCancel, onError } = props;
   const submit = (event: FormEvent) => {
     event.preventDefault();
     const problem = respondProblem(draft);
@@ -234,16 +238,20 @@ export function RespondStep(props: RespondProps) {
           onChange={onChange}
         />
       ))}
+      {canAddPerson(draft, guest.spots) && (
+        <button
+          className="rsvp-add"
+          type="button"
+          onClick={() => onChange(addPerson(draft, guest.spots))}
+        >
+          + Add a guest
+          <span className="rsvp-add-hint">{placesLeft(guest.spots - draft.people.length)}</span>
+        </button>
+      )}
       <div className="actions">
-        {canAddPerson(draft, guest.spots) && (
-          <button
-            className="button secondary"
-            type="button"
-            onClick={() => onChange(addPerson(draft, guest.spots))}
-          >
-            {guest.spots === 2 ? "Add a guest" : "Add someone"}
-          </button>
-        )}
+        <button className="button secondary" type="button" onClick={onCancel}>
+          Cancel
+        </button>
         <button className="button" type="submit">
           Continue
         </button>

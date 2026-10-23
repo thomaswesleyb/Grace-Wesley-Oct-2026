@@ -45,20 +45,30 @@ describe("rsvp draft", () => {
   });
 
   it("stops adding people at the guest's number of places", () => {
-    let draft = draftFor(sam);
+    let draft = answer(draftFor(sam), 0, true);
     for (let i = 0; i < sam.spots + 2; i++) draft = addPerson(draft, sam.spots);
     expect(draft.people).toHaveLength(sam.spots);
     expect(canAddPerson(draft, sam.spots)).toBe(false);
   });
 
   it("can't add anyone for a guest with one place", () => {
-    const draft = draftFor({ ...sam, spots: 1 });
+    const draft = answer(draftFor({ ...sam, spots: 1 }), 0, true);
     expect(canAddPerson(draft, 1)).toBe(false);
     expect(addPerson(draft, 1).people).toHaveLength(1);
   });
 
+  it("adds no one until the listed guest accepts", () => {
+    let draft = draftFor(sam);
+    expect(canAddPerson(draft, sam.spots)).toBe(false);
+    expect(addPerson(draft, sam.spots).people).toHaveLength(1);
+    draft = answer(draft, 0, false);
+    expect(canAddPerson(draft, sam.spots)).toBe(false);
+    draft = answer(draft, 0, true);
+    expect(addPerson(draft, sam.spots).people).toHaveLength(2);
+  });
+
   it("removes only the chosen person, and never the listed guest", () => {
-    let draft = addPerson(addPerson(draftFor(sam), 3), 3);
+    let draft = addPerson(addPerson(answer(draftFor(sam), 0, true), 3), 3);
     const [first, second, third] = draft.people;
     draft = removePerson(draft, second!.key);
     expect(draft.people.map((p) => p.key)).toEqual([first!.key, third!.key]);
@@ -66,7 +76,7 @@ describe("rsvp draft", () => {
   });
 
   it("drops the dietary note of someone declining and trims the email", () => {
-    let draft = addPerson(draftFor(sam), sam.spots);
+    let draft = addPerson(answer(draftFor(sam), 0, true), sam.spots);
     draft = answer(draft, 0, false);
     draft = updatePerson(draft, draft.people[0]!.key, { dietary: "nuts" });
     draft = named(draft, 1, "Kim", true);

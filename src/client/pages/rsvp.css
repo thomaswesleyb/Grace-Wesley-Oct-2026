@@ -54,6 +54,38 @@
   font-weight: 700;
 }
 
+.rsvp-add {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  justify-content: center;
+  gap: 0.25rem 0.75rem;
+  width: 100%;
+  min-height: 2.75rem;
+  margin: 0 0 1.25rem;
+  padding: 0.75rem 1rem;
+  font: inherit;
+  letter-spacing: 0.06em;
+  color: var(--cream-100);
+  background: transparent;
+  border: 1px dashed var(--sepia-400);
+  border-radius: var(--radius);
+  cursor: pointer;
+  transition:
+    border-color 150ms ease,
+    background 150ms ease;
+}
+
+.rsvp-add:hover {
+  border-color: var(--sepia-300);
+  background: rgb(239 230 214 / 0.07);
+}
+
+.rsvp-add-hint {
+  font-size: 0.9rem;
+  color: var(--sepia-300);
+}
+
 .rsvp-choice {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(11rem, 1fr));
