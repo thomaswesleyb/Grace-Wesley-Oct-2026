@@ -1,0 +1,120 @@
+.rsvp-label {
+  margin: 0 0 0.5rem;
+  text-align: center;
+  font-size: clamp(1.3rem, 4vw, 1.6rem);
+}
+
+.rsvp-muted {
+  margin: 0 0 1.5rem;
+  text-align: center;
+  color: var(--sepia-300);
+}
+
+.rsvp-progress {
+  display: flex;
+  justify-content: center;
+  gap: 0.5rem;
+  margin: 0 0 1.5rem;
+  padding: 0;
+  list-style: none;
+  counter-reset: step;
+}
+
+.rsvp-progress li {
+  counter-increment: step;
+  padding: 0.25rem 0.75rem;
+  font-size: 0.9rem;
+  color: var(--sepia-400);
+  border-bottom: 1px solid transparent;
+}
+
+.rsvp-progress li::before {
+  content: counter(step) ". ";
+}
+
+.rsvp-progress li[aria-current="step"] {
+  color: var(--cream-50);
+  border-bottom-color: var(--sepia-300);
+}
+
+.rsvp-progress li[data-done="true"] {
+  color: var(--sepia-300);
+}
+
+.rsvp-guest {
+  margin: 0 0 1.25rem;
+  padding: 1rem 1.25rem 0.25rem;
+  border: 1px solid rgb(168 139 106 / 0.3);
+  border-radius: var(--radius);
+}
+
+.rsvp-guest legend {
+  padding-inline: 0.5rem;
+  font-size: 1.15rem;
+  font-weight: 700;
+}
+
+.rsvp-choice {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(11rem, 1fr));
+  gap: 0.6rem;
+  margin-bottom: 1rem;
+}
+
+.rsvp-choice label {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  min-height: 2.75rem;
+  padding: 0.5rem 0.9rem;
+  border: 1px solid var(--espresso-600);
+  border-radius: var(--radius);
+  cursor: pointer;
+  transition:
+    border-color 150ms ease,
+    background 150ms ease;
+}
+
+.rsvp-choice label[data-selected="true"] {
+  border-color: var(--sepia-300);
+  background: rgb(239 230 214 / 0.07);
+}
+
+.rsvp-choice input {
+  accent-color: var(--sepia-300);
+  width: 1.1rem;
+  height: 1.1rem;
+}
+
+.rsvp-review {
+  display: grid;
+  gap: 0.75rem;
+  margin: 0;
+}
+
+.rsvp-review > div {
+  display: grid;
+  grid-template-columns: minmax(8rem, 1fr) 2fr;
+  gap: 0.25rem 1rem;
+  padding-bottom: 0.75rem;
+  border-bottom: 1px solid rgb(168 139 106 / 0.2);
+}
+
+.rsvp-review dt {
+  color: var(--sepia-300);
+}
+
+.rsvp-review dd {
+  margin: 0;
+  overflow-wrap: anywhere;
+}
+
+.rsvp-done {
+  text-align: center;
+}
+
+@media (max-width: 30rem) {
+  .rsvp-review > div {
+    grid-template-columns: 1fr;
+  }
+}

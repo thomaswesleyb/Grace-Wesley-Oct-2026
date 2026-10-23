@@ -1,0 +1,38 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "parkhill-bailey-wedding",
+  "main": "src/worker/index.ts",
+  "compatibility_date": "2026-10-01",
+  "routes": [
+    { "pattern": "parkhillbaileywedding.com", "custom_domain": true },
+    { "pattern": "www.parkhillbaileywedding.com", "custom_domain": true },
+  ],
+  "workers_dev": false,
+  "preview_urls": false,
+  "assets": {
+    "not_found_handling": "single-page-application",
+    "run_worker_first": ["/api/*"],
+  },
+  "d1_databases": [
+    {
+      "binding": "DB",
+      "database_name": "wedding",
+      "database_id": "0350f83b-51a1-469b-bf24-ccf9a75200a4",
+      "migrations_dir": "migrations",
+    },
+  ],
+  "ratelimits": [
+    {
+      "name": "RSVP_LIMITER",
+      "namespace_id": "1001",
+      "simple": { "limit": 10, "period": 60 },
+    },
+  ],
+  "vars": {
+    "ACCESS_TEAM_DOMAIN": "parkhillbailey.cloudflareaccess.com",
+    "ACCESS_AUD": "51a27e8a028bb5757fb6806b0d01a5173fc8777027f401e4cbbd9ce73119e214",
+    "ALERT_TO": "parkhill.bailey.wedding@gmail.com",
+    "ALERT_FROM": "RSVP <rsvp@parkhillbaileywedding.com>",
+  },
+  "observability": { "enabled": true },
+}

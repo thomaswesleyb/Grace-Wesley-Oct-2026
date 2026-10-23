@@ -1,0 +1,25 @@
+repos:
+  - repo: local
+    hooks:
+      - id: oxlint
+        name: oxlint
+        entry: pnpm lint
+        language: system
+        pass_filenames: false
+        types_or: [ts, tsx]
+      - id: oxfmt
+        name: oxfmt --check
+        entry: pnpm fmt:check
+        language: system
+        pass_filenames: false
+      - id: tsc
+        name: tsc --noEmit
+        entry: pnpm typecheck
+        language: system
+        pass_filenames: false
+        types_or: [ts, tsx]
+      - id: no-guest-lists
+        name: block guest list CSVs
+        entry: guest CSVs hold private data and must never be committed
+        language: fail
+        files: '(^|/)guest[^/]*\.csv$'
