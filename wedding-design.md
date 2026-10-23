@@ -30,14 +30,16 @@ There is no separate Our Story or Travel & Stay page; travel and lodging live in
   them in `content/backdrops.json`. Use only photos the couple has rights to. Originals stay
   unmodified.
 - **Type:** Playfair Display SC for names and body text. UnifrakturMaguntia (blackletter) for the
-  date and time only. Both fonts are self-hosted.
+  "and" between the names, the date and time, and the venue and city, as on the invitation.
+  Both fonts are self-hosted.
 - **Ornament:** SVG lattice side borders and filigree corner pieces traced from the invitation.
 
 ## Title page
-The invitation is rebuilt in live HTML/CSS as a faithful copy of the printed card: the toned
-photo, traced lattice and filigree, and every text line placed at the print's measured size and
-position (in container units, so it scales like the print). UnifrakturMaguntia stays for the
-date and time: of the free blackletters tested it overlaps the printed date best (the print's
+The invitation is rebuilt in live HTML/CSS as a faithful copy of the printed card
+(`invitation.jpeg`, 2026-10-22): the light rgb(222 217 214) border, the toned photo, traced
+lattice and filigree, and every text line placed at the print's measured size and position (in
+container units, so it scales like the print). UnifrakturMaguntia stays for the
+blackletter lines: of the free blackletters tested it overlaps the printed date best (the print's
 face looks like Old English Text MT, which is a licensed font). On load the ornaments draw in and the text fades up.
 "All Saints Chapel" links to a map, and "Kindly RSVP" goes to the RSVP page. Scrolling past the
 card shows the day's details and a countdown to October 23, 2027.
