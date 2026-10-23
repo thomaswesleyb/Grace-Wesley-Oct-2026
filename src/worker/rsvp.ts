@@ -17,6 +17,7 @@ import {
 } from "@worker/db.ts";
 import type { Env } from "@worker/env.ts";
 import { sendAlert } from "@worker/notify.ts";
+import { startSession } from "@worker/session.ts";
 
 export const rsvp = new Hono<{ Bindings: Env }>();
 
@@ -100,6 +101,7 @@ rsvp.post("/", async (c) => {
   const body = { ...parsed.data, people: [self, ...others] };
 
   const { replaced } = await insertRsvp(c.env.DB, guest.id, body, new Date().toISOString());
+  await startSession(c, guest.id);
   const result = tally(body);
   const changed = replaced ? " (changed)" : "";
   const subject = `RSVP${changed}: ${guest.first_name} ${guest.last_name} (${result.attending} attending, ${result.declining} declining)`;

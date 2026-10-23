@@ -1,10 +1,22 @@
-import { useCallback, useEffect, useMemo, useRef, useState, type PointerEvent } from "react";
+import {
+  type PointerEvent,
+  type ReactNode,
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
 import { LeafLitter } from "@client/labyrinth/LeafLitter.tsx";
+import { LeaderboardPanel, useLeaderboard } from "@client/labyrinth/Leaderboard.tsx";
 import { type Animal, AnimalIcon, AnimalMark, otherAnimal } from "@client/labyrinth/animals.tsx";
 import { EDGE, type Game, blocking, startGame, walk } from "@client/labyrinth/game.ts";
 import { type Point, RINGS, cellCenter } from "@client/labyrinth/maze.ts";
 import { wallPath } from "@client/labyrinth/walls.ts";
+import { apiFetch, ApiRequestError } from "@client/api.ts";
+import { type SessionGuest, useSession } from "@client/session.ts";
 import { site } from "@client/site.ts";
+import { okResponse } from "@shared/schemas.ts";
 import "@client/pages/labyrinth.css";
 
 /** Screen directions for the arrow keys and WASD, in maze units per key press. */
@@ -170,13 +182,52 @@ function Meeting({ game }: { game: Game }) {
   );
 }
 
+type Saved = { ok: true } | { ok: false; error: string } | null;
+
+/**
+ * Saves each won game's time under the guest's name, once, then calls `onSaved`. Returns how
+ * saving the current game went: null while it's unfinished or saving, or when there's no guest.
+ */
+function useSaveRun(
+  game: Game | null,
+  guest: SessionGuest | null | undefined,
+  onSaved: () => void,
+): Saved {
+  const [saved, setSaved] = useState<{ game: Game; result: Saved } | null>(null);
+  const sent = useRef<Game | null>(null);
+  const finished = game !== null && game.won ? game : null;
+  useEffect(() => {
+    if (finished === null || finished.finishedAt === null || !guest) return;
+    if (sent.current === finished) return;
+    sent.current = finished;
+    const body = { animal: finished.animal, durationMs: finished.finishedAt - finished.startedAt };
+    apiFetch("/api/labyrinth/runs", okResponse, { method: "POST", body })
+      .then(() => {
+        setSaved({ game: finished, result: { ok: true } });
+        onSaved();
+      })
+      .catch((e: unknown) => {
+        const error = e instanceof ApiRequestError ? e.message : "Your time couldn't be saved.";
+        setSaved({ game: finished, result: { ok: false, error } });
+      });
+  }, [finished, guest, onSaved]);
+  return saved !== null && saved.game === finished ? saved.result : null;
+}
+
+function SavedNote({ saved, guest }: { saved: Saved; guest: SessionGuest | null | undefined }) {
+  if (saved === null || !guest) return null;
+  if (!saved.ok) return <p className="notice error">{saved.error}</p>;
+  return <p className="labyrinth-saved">Your time is saved, {guest.firstName}.</p>;
+}
+
 interface WinProps {
   animal: Animal;
   onAgain: () => void;
   onSwitch: () => void;
+  children: ReactNode;
 }
 
-function WinPanel({ animal, onAgain, onSwitch }: WinProps) {
+function WinPanel({ animal, onAgain, onSwitch, children }: WinProps) {
   const again = useRef<HTMLButtonElement>(null);
   useEffect(() => again.current?.focus(), []);
   return (
@@ -184,6 +235,7 @@ function WinPanel({ animal, onAgain, onSwitch }: WinProps) {
       <h2>
         The {animal} found the {otherAnimal(animal)}
       </h2>
+      {children}
       <div className="actions">
         <button ref={again} type="button" className="button" onClick={onAgain}>
           Walk it again
@@ -213,6 +265,42 @@ function useKeyboard(active: boolean, onNudge: (by: Point) => void) {
   }, [active, onNudge]);
 }
 
+interface PlayProps {
+  game: Game;
+  onDrag: (to: Point) => void;
+  onNewGame: (animal: Animal) => void;
+  saved: Saved;
+  guest: SessionGuest | null | undefined;
+}
+
+/** The board, what's happening, and once won, the way to play again. */
+function Play({ game, onDrag, onNewGame, saved, guest }: PlayProps) {
+  const other = otherAnimal(game.animal);
+  return (
+    <>
+      <Board game={game} onDrag={onDrag} />
+      <p className="labyrinth-status" aria-live="polite">
+        {game.message}
+      </p>
+      {game.won ? (
+        <WinPanel
+          animal={game.animal}
+          onAgain={() => onNewGame(game.animal)}
+          onSwitch={() => onNewGame(other)}
+        >
+          <SavedNote saved={saved} guest={guest} />
+        </WinPanel>
+      ) : (
+        <p className="labyrinth-hint">
+          {game.hasRing
+            ? `Drag the ${game.animal} to the ${other}.`
+            : `Drag the ${game.animal} to the ring, then to the ${other}.`}
+        </p>
+      )}
+    </>
+  );
+}
+
 export function Labyrinth() {
   const [game, setGame] = useState<Game | null>(null);
   const onDrag = useCallback(
@@ -227,34 +315,23 @@ export function Labyrinth() {
     [],
   );
   useKeyboard(game !== null && !game.won, onNudge);
+  const { guest } = useSession();
+  const { board, reload } = useLeaderboard();
+  const saved = useSaveRun(game, guest, reload);
+  const [wonOnce, setWonOnce] = useState(false);
+  if (game?.won === true && !wonOnce) setWonOnce(true);
+  const onNewGame = (animal: Animal) => setGame(startGame(animal, newSeed(), Date.now()));
 
   return (
     <section className="page labyrinth-page">
       <h1>The Labyrinth</h1>
       {site.labyrinthIntro !== null && <p className="lede">{site.labyrinthIntro}</p>}
       {game === null ? (
-        <StartScreen onChoose={(animal) => setGame(startGame(animal, newSeed(), Date.now()))} />
+        <StartScreen onChoose={onNewGame} />
       ) : (
-        <>
-          <Board game={game} onDrag={onDrag} />
-          <p className="labyrinth-status" aria-live="polite">
-            {game.message}
-          </p>
-          {game.won ? (
-            <WinPanel
-              animal={game.animal}
-              onAgain={() => setGame(startGame(game.animal, newSeed(), Date.now()))}
-              onSwitch={() => setGame(startGame(otherAnimal(game.animal), newSeed(), Date.now()))}
-            />
-          ) : (
-            <p className="labyrinth-hint">
-              {game.hasRing
-                ? `Drag the ${game.animal} to the ${otherAnimal(game.animal)}.`
-                : `Drag the ${game.animal} to the ring, then to the ${otherAnimal(game.animal)}.`}
-            </p>
-          )}
-        </>
+        <Play game={game} onDrag={onDrag} onNewGame={onNewGame} saved={saved} guest={guest} />
       )}
+      <LeaderboardPanel board={board} wonOnce={wonOnce} signedIn={Boolean(guest)} />
     </section>
   );
 }

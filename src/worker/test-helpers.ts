@@ -7,6 +7,8 @@ import type { Env } from "@worker/env.ts";
 export async function resetDb(): Promise<void> {
   await env.DB.batch([
     env.DB.prepare("DELETE FROM photos"),
+    env.DB.prepare("DELETE FROM sessions"),
+    env.DB.prepare("DELETE FROM labyrinth_runs"),
     env.DB.prepare("DELETE FROM questions"),
     env.DB.prepare("DELETE FROM contributions"),
     env.DB.prepare("DELETE FROM registry_items"),

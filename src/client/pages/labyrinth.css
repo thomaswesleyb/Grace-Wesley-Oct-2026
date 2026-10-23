@@ -209,3 +209,52 @@
   margin: 0.5rem 0 0;
   font-size: 1.4rem;
 }
+
+.labyrinth-saved {
+  margin: 0.25rem 0 0;
+  font-style: italic;
+}
+
+.labyrinth-leaderboard {
+  max-width: 32rem;
+  margin: 1.5rem auto 0;
+  text-align: left;
+}
+
+.labyrinth-leaderboard summary {
+  cursor: pointer;
+  font-size: 1.1rem;
+}
+
+.labyrinth-leaderboard table {
+  width: 100%;
+  margin-top: 0.75rem;
+  border-collapse: collapse;
+  font-variant-numeric: tabular-nums;
+}
+
+.labyrinth-leaderboard th,
+.labyrinth-leaderboard td {
+  padding: 0.35rem 0.5rem;
+  border-bottom: 1px solid var(--espresso-600);
+  text-align: left;
+}
+
+.labyrinth-leaderboard th {
+  color: var(--sepia-300);
+  font-weight: normal;
+}
+
+.labyrinth-leaderboard td:last-child,
+.labyrinth-leaderboard th:last-child {
+  text-align: right;
+}
+
+.labyrinth-leaderboard tr.you td {
+  color: var(--cream-50);
+  font-weight: bold;
+}
+
+.labyrinth-rank {
+  color: var(--sepia-300);
+}

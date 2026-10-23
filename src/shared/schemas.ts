@@ -221,9 +221,10 @@ export const photoUploadFields = z.object({
   caption: optionalText(300),
 });
 
+/** A guest with a session sends no name; their session says who they are. */
 export const guestPhotoUploadFields = photoUploadFields.extend({
-  firstName: personName,
-  lastName: personName,
+  firstName: personName.optional(),
+  lastName: personName.optional(),
 });
 
 export const photoUploadResult = z.object({
@@ -264,3 +265,40 @@ export type AddedQuestion = z.infer<typeof addedQuestion>;
 /** Oldest first. */
 export const questionsResponse = z.object({ questions: z.array(addedQuestion) });
 export type QuestionsResponse = z.infer<typeof questionsResponse>;
+
+/** Who the visitor is, once they've sent an RSVP from this browser; null until then. */
+export const sessionResponse = z.object({
+  guest: z.object({ firstName: z.string(), lastName: z.string() }).nullable(),
+});
+export type SessionResponse = z.infer<typeof sessionResponse>;
+
+/** Longest walk through the labyrinth that's saved: a day, in milliseconds. */
+export const MAX_RUN_MS = 24 * 60 * 60 * 1000;
+
+export const labyrinthRun = z.object({
+  animal: z.enum(["fox", "deer"]),
+  durationMs: z.number().int().min(1).max(MAX_RUN_MS),
+});
+
+/** Places shown on the leaderboard. */
+export const LEADERBOARD_SIZE = 10;
+
+export const leaderboardEntry = z.object({
+  /** Equal times share a rank. */
+  rank: z.number().int().min(1),
+  /** First name and last initial, e.g. "Sam L.". */
+  name: z.string(),
+  /** The guest's best time. */
+  durationMs: z.number().int(),
+  /** True for the visitor's own entry. */
+  you: z.boolean(),
+});
+export type LeaderboardEntry = z.infer<typeof leaderboardEntry>;
+
+export const leaderboardResponse = z.object({
+  /** Fastest first, at most LEADERBOARD_SIZE. */
+  entries: z.array(leaderboardEntry),
+  /** The visitor's own entry, wherever it ranks; null without a session or a saved time. */
+  you: leaderboardEntry.nullable(),
+});
+export type LeaderboardResponse = z.infer<typeof leaderboardResponse>;

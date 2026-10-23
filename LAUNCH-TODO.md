@@ -27,6 +27,9 @@ and Access on `/admin`. The Registry link is hidden.
 shared code. Guests find their own name, and each can answer for up to their
 `total_guest_spots`. Production has migration 0005 and all 59 guests (94 places).
 
+**Built Oct 22, not deployed:** guest sessions (an RSVP signs the guest in for Labyrinth times,
+the leaderboard and photo credit). Needs `! pnpm db:migrate:remote` (migration 0008), then `! pnpm deploy`.
+
 **Left before invitations go out:**
 
 1. Commit and push the guest-list RSVP work.

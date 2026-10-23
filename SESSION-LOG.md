@@ -6,6 +6,43 @@ setup steps in `README.md`, and your step-by-step launch plan in `LAUNCH-TODO.md
 
 ---
 
+## 2026-10-22 (later): Guest sessions
+
+### Decisions (and why)
+
+- **An RSVP starts a session.** Sending an RSVP (attending or not) sets an HttpOnly, Secure,
+  SameSite=Lax `__Host-session` cookie for 400 days, the longest browsers allow. D1 stores only a
+  SHA-256 hash of the token. A session counts only while the guest still has places, so a 0-spot
+  guest looks the same as a stranger.
+- **A session belongs to the guest-list row.** Everyone on that invitation shares that guest's
+  name. Another device, or a plus-one's phone, has no session until an RSVP is sent from it.
+- **Labyrinth times are measured in the browser**, from choosing an animal to reaching the
+  center, and saved only for guests with a session. The server checks the time's range, not
+  whether the time is genuine. Guests without a session can play, but nothing is saved.
+- **The leaderboard shows each guest's best time**, top 10, as "Sam L." (first name and last
+  initial, so the whole guest list isn't public). Equal times share a rank. A signed-in guest
+  below the top 10 sees their own place on an extra row. It's a collapsible panel under the
+  game, closed at first. It appears once the visitor has won on this visit, or has a time saved
+  from an earlier one.
+- **Photo credit comes from the session first.** A guest with a session isn't asked for a
+  name, and "Not you?" signs out a shared device. Guests without one still type their name.
+
+### What was built
+
+| Area | Where |
+|---|---|
+| Sessions: start, look up, sign out (`/api/session`) | `src/worker/session.ts`, `src/client/session.ts` |
+| Saving labyrinth times (`/api/labyrinth/runs`) | `src/worker/labyrinth.ts`, `src/client/pages/Labyrinth.tsx` |
+| Leaderboard (`/api/labyrinth/leaderboard`) | `src/worker/labyrinth.ts`, `src/client/labyrinth/Leaderboard.tsx` |
+| Photo credit from the session | `src/worker/photos.ts`, `src/client/photos/GuestUpload.tsx` |
+| Database | `migrations/0008_sessions.sql` (`sessions`, `labyrinth_runs`) |
+
+### Still open
+
+- Production: `pnpm db:migrate:remote`, then deploy.
+
+---
+
 ## 2026-10-22: Photos from the cloud, and guest photo sharing
 
 ### Decisions (and why)

@@ -5,7 +5,9 @@ import type { Env } from "@worker/env.ts";
 import { adminPhotos, media, photos } from "@worker/photos.ts";
 import { adminQuestions, questions } from "@worker/questions.ts";
 import { registry, stripeWebhook } from "@worker/registry.ts";
+import { labyrinth } from "@worker/labyrinth.ts";
 import { rsvp } from "@worker/rsvp.ts";
+import { session } from "@worker/session.ts";
 
 const api = new Hono<{ Bindings: Env }>();
 
@@ -17,6 +19,8 @@ api.use("*", async (c, next) => {
 });
 
 api.route("/rsvp", rsvp);
+api.route("/session", session);
+api.route("/labyrinth", labyrinth);
 api.route("/admin/photos", adminPhotos);
 api.route("/admin/questions", adminQuestions);
 api.route("/admin", admin);

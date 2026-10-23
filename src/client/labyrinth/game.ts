@@ -31,6 +31,8 @@ export interface Game {
   hasRing: boolean;
   won: boolean;
   startedAt: number;
+  /** When the player reached the center, in milliseconds; null until then. */
+  finishedAt: number | null;
   message: string;
 }
 
@@ -50,6 +52,7 @@ export function startGame(animal: Animal, seed: number, now: number): Game {
     hasRing: false,
     won: false,
     startedAt: now,
+    finishedAt: null,
     message: `You are the ${animal}, at the entrance. Find the ring before you go to the ${otherAnimal(animal)}.`,
   };
 }
@@ -83,6 +86,7 @@ export function walk(game: Game, to: Point, now: number): Game {
     return {
       ...moved,
       won: true,
+      finishedAt: now,
       message: `You brought the ring to the ${other} in ${seconds} seconds.`,
     };
   }
