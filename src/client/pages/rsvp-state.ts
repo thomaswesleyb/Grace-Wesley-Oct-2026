@@ -33,7 +33,9 @@ export function draftFor(guest: ListedGuest): Draft {
   };
 }
 
-export const canAddPerson = (draft: Draft, spots: number) => draft.people.length < spots;
+/** People can be added once the listed guest accepts, up to their number of places. */
+export const canAddPerson = (draft: Draft, spots: number) =>
+  draft.people[0]?.attending === true && draft.people.length < spots;
 
 export function addPerson(draft: Draft, spots: number): Draft {
   return canAddPerson(draft, spots)
