@@ -1,51 +1,45 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type PointerEvent } from "react";
+import { LeafLitter } from "@client/labyrinth/LeafLitter.tsx";
 import { type Animal, AnimalIcon, AnimalMark, otherAnimal } from "@client/labyrinth/animals.tsx";
-import {
-  CENTER,
-  type Direction,
-  type Maze,
-  RINGS,
-  cellCenter,
-  generateMaze,
-  locate,
-  move,
-} from "@client/labyrinth/maze.ts";
+import { EDGE, type Game, blocking, startGame, walk } from "@client/labyrinth/game.ts";
+import { type Point, RINGS, cellCenter } from "@client/labyrinth/maze.ts";
 import { wallPath } from "@client/labyrinth/walls.ts";
 import { site } from "@client/site.ts";
 import "@client/pages/labyrinth.css";
 
-const KEYS: Record<string, Direction> = {
-  ArrowUp: "up",
-  ArrowDown: "down",
-  ArrowLeft: "left",
-  ArrowRight: "right",
-  w: "up",
-  s: "down",
-  a: "left",
-  d: "right",
+/** Screen directions for the arrow keys and WASD, in maze units per key press. */
+const KEY_STEP = 0.25;
+const KEYS: Record<string, Point> = {
+  ArrowUp: { x: 0, y: -KEY_STEP },
+  ArrowDown: { x: 0, y: KEY_STEP },
+  ArrowLeft: { x: -KEY_STEP, y: 0 },
+  ArrowRight: { x: KEY_STEP, y: 0 },
+  w: { x: 0, y: -KEY_STEP },
+  s: { x: 0, y: KEY_STEP },
+  a: { x: -KEY_STEP, y: 0 },
+  d: { x: KEY_STEP, y: 0 },
 };
 
-const ARROWS: { direction: Direction; label: string; glyph: string }[] = [
-  { direction: "up", label: "Move up", glyph: "↑" },
-  { direction: "left", label: "Move left", glyph: "←" },
-  { direction: "right", label: "Move right", glyph: "→" },
-  { direction: "down", label: "Move down", glyph: "↓" },
-];
-
-/** A swipe shorter than this (in CSS pixels) is treated as a tap and ignored. */
-const MIN_SWIPE = 24;
-const EDGE = RINGS + 1;
+/** A drag must start this close to the player, in maze units. */
+const GRAB_RADIUS = 0.9;
 const VIEW = `${-EDGE - 0.6} ${-EDGE - 0.6} ${2 * EDGE + 1.2} ${2 * EDGE + 1.2}`;
+/** Where the player stands beside the other animal once they meet in the center. */
+const MEETING_SPOT = { x: -0.42, y: 0.1 };
+/** Where the ring rides once carried, relative to the player. */
+const CARRIED = { x: 0.26, y: -0.28 };
+
+const GEM = "M 0 -0.3 L 0.07 -0.22 L 0 -0.15 L -0.07 -0.22 Z";
+
+const newSeed = () => Math.floor(Math.random() * 2 ** 32);
 
 const HEART =
   "M 0 -0.42 C -0.08 -0.62 -0.36 -0.62 -0.36 -0.4 C -0.36 -0.24 -0.12 -0.14 0 -0.02 C 0.12 -0.14 0.36 -0.24 0.36 -0.4 C 0.36 -0.62 0.08 -0.62 0 -0.42 Z";
 
-const newSeed = () => Math.floor(Math.random() * 2 ** 32);
-
-function swipeDirection(dx: number, dy: number): Direction | null {
-  if (Math.max(Math.abs(dx), Math.abs(dy)) < MIN_SWIPE) return null;
-  if (Math.abs(dx) > Math.abs(dy)) return dx > 0 ? "right" : "left";
-  return dy > 0 ? "down" : "up";
+function toMaze(svg: SVGSVGElement, event: PointerEvent): Point | null {
+  const matrix = svg.getScreenCTM();
+  if (matrix === null) return null;
+  const point = new DOMPoint(event.clientX, event.clientY).matrixTransform(matrix.inverse());
+  return { x: point.x, y: point.y };
 }
 
 function StartScreen({ onChoose }: { onChoose: (animal: Animal) => void }) {
@@ -69,73 +63,110 @@ function StartScreen({ onChoose }: { onChoose: (animal: Animal) => void }) {
   );
 }
 
-interface BoardProps {
-  maze: Maze;
-  animal: Animal;
-  position: number;
-  onMove: (direction: Direction) => void;
+/** A gold band with a small stone; it glows while it waits to be found. */
+function WeddingRing({ at, scale, glow }: { at: Point; scale: number; glow: boolean }) {
+  return (
+    <g
+      className="labyrinth-wedding-ring"
+      transform={`translate(${at.x} ${at.y}) scale(${scale})`}
+      aria-hidden="true"
+    >
+      {glow && <circle className="ring-glow" r={0.34} />}
+      <circle className="ring-band" r={0.15} />
+      <path className="ring-gem" d={GEM} />
+    </g>
+  );
 }
 
-function Board({ maze, animal, position, onMove }: BoardProps) {
-  const walls = useMemo(() => wallPath(maze), [maze]);
-  const swipeStart = useRef<{ x: number; y: number } | null>(null);
-  const won = position === CENTER;
-  const at = cellCenter(maze, position);
-  const player = won ? { x: -0.42, y: 0.1 } : at;
+interface BoardProps {
+  game: Game;
+  onDrag: (to: Point) => void;
+}
 
-  const onPointerDown = (event: PointerEvent) => {
-    swipeStart.current = { x: event.clientX, y: event.clientY };
+/**
+ * Pointer handlers that drag the player. A drag starts only on the player, and the player keeps
+ * its offset from the pointer so it doesn't jump to the fingertip.
+ */
+function useDrag(position: Point, enabled: boolean, onDrag: (to: Point) => void) {
+  const grab = useRef<Point | null>(null);
+  const [dragging, setDragging] = useState(false);
+  const endDrag = () => {
+    grab.current = null;
+    setDragging(false);
   };
-  const onPointerUp = (event: PointerEvent) => {
-    const start = swipeStart.current;
-    swipeStart.current = null;
-    if (start === null) return;
-    const direction = swipeDirection(event.clientX - start.x, event.clientY - start.y);
-    if (direction !== null) onMove(direction);
+  const onPointerDown = (event: PointerEvent<SVGSVGElement>) => {
+    const point = toMaze(event.currentTarget, event);
+    if (!enabled || point === null) return;
+    const offset = { x: point.x - position.x, y: point.y - position.y };
+    if (Math.hypot(offset.x, offset.y) > GRAB_RADIUS) return;
+    event.currentTarget.setPointerCapture(event.pointerId);
+    grab.current = offset;
+    setDragging(true);
   };
+  const onPointerMove = (event: PointerEvent<SVGSVGElement>) => {
+    const offset = grab.current;
+    const point = toMaze(event.currentTarget, event);
+    if (offset === null || point === null) return;
+    onDrag({ x: point.x - offset.x, y: point.y - offset.y });
+  };
+  const handlers = { onPointerDown, onPointerMove, onPointerUp: endDrag, onPointerCancel: endDrag };
+  return { dragging, handlers };
+}
+
+/** The player follows the pointer while dragged, stopping at walls and sliding along them. */
+function Board({ game, onDrag }: BoardProps) {
+  const { walls, gatedWalls, animal, position, hasRing, won } = game;
+  const path = useMemo(() => wallPath(walls), [walls]);
+  const { dragging, handlers } = useDrag(position, !won, onDrag);
 
   return (
     <svg
-      className="labyrinth-board"
+      className={`labyrinth-board${dragging ? " dragging" : ""}`}
       viewBox={VIEW}
       role="img"
-      aria-label={`A round maze of ${RINGS} rings. The ${otherAnimal(animal)} waits in the center.`}
-      onPointerDown={onPointerDown}
-      onPointerUp={onPointerUp}
-      onPointerCancel={() => (swipeStart.current = null)}
+      aria-label={`A round maze of ${RINGS} circuits. A ring lies in one of its dead ends, and the ${otherAnimal(animal)} waits behind a gate in the center.`}
+      {...handlers}
     >
       <circle className="labyrinth-ground" r={EDGE} />
       <circle className="labyrinth-rim" r={EDGE + 0.4} />
-      <path className="labyrinth-walls" d={walls} />
+      <LeafLitter layout={gatedWalls} walls={blocking(game)} rim={EDGE} player={position} />
+      <path className="labyrinth-walls" d={path} />
+      {!hasRing && <RingAndGate game={game} />}
+      <Meeting game={game} />
+    </svg>
+  );
+}
+
+/** The ring waiting in its dead end and the gate it opens, both gone once the ring is carried. */
+function RingAndGate({ game }: { game: Game }) {
+  const { maze, gate } = game;
+  const ringSpot = useMemo(() => cellCenter(maze, maze.weddingRing), [maze]);
+  return (
+    <>
+      <path className="labyrinth-gate" d={wallPath([gate])} />
+      <WeddingRing at={ringSpot} scale={1} glow />
+    </>
+  );
+}
+
+/** Both animals: the other waits in the center, and on a win the player joins it there. */
+function Meeting({ game }: { game: Game }) {
+  const { animal, position, hasRing, won } = game;
+  const player = won ? MEETING_SPOT : position;
+  return (
+    <>
       <g transform={`translate(${won ? 0.42 : 0} ${won ? 0.1 : 0})`}>
         <AnimalMark animal={otherAnimal(animal)} scale={won ? 0.38 : 0.55} />
       </g>
       {won && <path className="labyrinth-heart" d={HEART} transform="translate(0 -0.35)" />}
       <g
-        className="labyrinth-player"
+        className={`labyrinth-player${won ? " arrived" : ""}`}
         style={{ transform: `translate(${player.x}px, ${player.y}px)` }}
       >
         <AnimalMark animal={animal} scale={0.38} />
+        {hasRing && <WeddingRing at={CARRIED} scale={0.7} glow={false} />}
       </g>
-    </svg>
-  );
-}
-
-function ArrowPad({ onMove }: { onMove: (direction: Direction) => void }) {
-  return (
-    <div className="labyrinth-pad" role="group" aria-label="Move">
-      {ARROWS.map(({ direction, label, glyph }) => (
-        <button
-          key={direction}
-          type="button"
-          className={`labyrinth-arrow labyrinth-arrow-${direction}`}
-          aria-label={label}
-          onClick={() => onMove(direction)}
-        >
-          {glyph}
-        </button>
-      ))}
-    </div>
+    </>
   );
 }
 
@@ -165,86 +196,62 @@ function WinPanel({ animal, onAgain, onSwitch }: WinProps) {
   );
 }
 
-/** Arrow keys and WASD move the player while a game is running. */
-function useKeyboard(active: boolean, onMove: (direction: Direction) => void) {
+/** Arrow keys and WASD nudge the player while a game is running. */
+function useKeyboard(active: boolean, onNudge: (by: Point) => void) {
   useEffect(() => {
     if (!active) return;
     const onKey = (event: KeyboardEvent) => {
       if (event.altKey || event.ctrlKey || event.metaKey) return;
       if (event.target instanceof HTMLElement && event.target.closest("input, textarea")) return;
-      const direction = KEYS[event.key.length === 1 ? event.key.toLowerCase() : event.key];
-      if (direction === undefined) return;
+      const by = KEYS[event.key.length === 1 ? event.key.toLowerCase() : event.key];
+      if (by === undefined) return;
       event.preventDefault();
-      onMove(direction);
+      onNudge(by);
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [active, onMove]);
-}
-
-interface Game {
-  animal: Animal;
-  maze: Maze;
-  position: number;
-  moves: number;
-  message: string;
-}
-
-function startGame(animal: Animal): Game {
-  const maze = generateMaze(newSeed());
-  return {
-    animal,
-    maze,
-    position: maze.entrance,
-    moves: 0,
-    message: `You are the ${animal}, at the entrance on ring ${RINGS}.`,
-  };
-}
-
-function step(game: Game, direction: Direction): Game {
-  if (game.position === CENTER) return game;
-  const next = move(game.maze, game.position, direction);
-  if (next === game.position) return { ...game, message: "A wall blocks the way." };
-  const moves = game.moves + 1;
-  const message =
-    next === CENTER
-      ? `You found the ${otherAnimal(game.animal)} in ${moves} moves.`
-      : `Ring ${locate(game.maze, next).ring}.`;
-  return { ...game, position: next, moves, message };
+  }, [active, onNudge]);
 }
 
 export function Labyrinth() {
   const [game, setGame] = useState<Game | null>(null);
-  const won = game?.position === CENTER;
-  const onMove = useCallback(
-    (direction: Direction) => setGame((g) => (g === null ? g : step(g, direction))),
+  const onDrag = useCallback(
+    (to: Point) => setGame((g) => (g === null ? g : walk(g, to, Date.now()))),
     [],
   );
-  useKeyboard(game !== null && !won, onMove);
+  const onNudge = useCallback(
+    (by: Point) =>
+      setGame((g) =>
+        g === null ? g : walk(g, { x: g.position.x + by.x, y: g.position.y + by.y }, Date.now()),
+      ),
+    [],
+  );
+  useKeyboard(game !== null && !game.won, onNudge);
 
   return (
     <section className="page labyrinth-page">
       <h1>The Labyrinth</h1>
       {site.labyrinthIntro !== null && <p className="lede">{site.labyrinthIntro}</p>}
       {game === null ? (
-        <StartScreen onChoose={(animal) => setGame(startGame(animal))} />
+        <StartScreen onChoose={(animal) => setGame(startGame(animal, newSeed(), Date.now()))} />
       ) : (
         <>
-          <Board maze={game.maze} animal={game.animal} position={game.position} onMove={onMove} />
+          <Board game={game} onDrag={onDrag} />
           <p className="labyrinth-status" aria-live="polite">
             {game.message}
           </p>
-          {won ? (
+          {game.won ? (
             <WinPanel
               animal={game.animal}
-              onAgain={() => setGame(startGame(game.animal))}
-              onSwitch={() => setGame(startGame(otherAnimal(game.animal)))}
+              onAgain={() => setGame(startGame(game.animal, newSeed(), Date.now()))}
+              onSwitch={() => setGame(startGame(otherAnimal(game.animal), newSeed(), Date.now()))}
             />
           ) : (
-            <>
-              <ArrowPad onMove={onMove} />
-              <p className="labyrinth-hint">Arrow keys, WASD, or swipe on the maze.</p>
-            </>
+            <p className="labyrinth-hint">
+              {game.hasRing
+                ? `Drag the ${game.animal} to the ${otherAnimal(game.animal)}.`
+                : `Drag the ${game.animal} to the ring, then to the ${otherAnimal(game.animal)}.`}
+            </p>
           )}
         </>
       )}

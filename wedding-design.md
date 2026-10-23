@@ -74,17 +74,20 @@ accessibility); registry and other. Each entry appears only when its answer is i
   and who hasn't answered.
 
 ## Photos
-- Every photo in `images/` (JPEG, PNG, WebP or HEIC; never modified) is shown. Adding or
-  removing a file is all it takes (decided 2026-10-21, replacing a required CSV row per photo).
-- `images/captions.csv` (`file,caption,alt`) is optional. Photos with a row come first, in CSV
-  order, with that caption and alt text. The rest follow in natural file-name order with the
-  alt text "Photo N of M". Captions and descriptions come only from the couple.
-- `pnpm gen:gallery` (also run by `pnpm dev` and `pnpm build`) makes WebP copies in
-  `public/photos/gallery/` (up to 1600 px, plus an 800 px copy for wider photos) in the photos'
-  own colors, with no sepia toning, unlike the page backdrops. It fixes camera rotation and
-  strips metadata, including GPS location, and skips photos whose copies are up to date. It
-  writes `content/gallery.json`, which is committed. If `images/` has no photos (e.g. a fresh
-  clone without the originals), it leaves the current gallery as it is.
+- Photos live in Cloudflare (R2 for the files, D1 for captions and order), not in the build, so
+  adding one needs no deploy (decided 2026-10-22, replacing the `images/` folder and
+  `pnpm gen:gallery`).
+- The couple adds photos by dragging them onto `/admin/photos`. Their browser makes the copies:
+  up to 1600 px, plus an 800 px copy for wider photos, in the photos' own colors, with no sepia
+  toning, unlike the page backdrops. Redrawing them fixes camera rotation and drops metadata,
+  including GPS location. New photos go last; the admin page reorders them.
+- Photos without a description are read as "Photo N of M". Captions and descriptions come only
+  from the couple.
+- Guests can share photos after the wedding, once the couple opens sharing in admin. A guest
+  gives their guest-list name; each photo waits for the couple's approval. Approved ones appear
+  under "From our guests", after the couple's photos, oldest first, credited "Shared by <name>".
+- Storage stays inside R2's free tier: 8 GB in all, and 300 MB or 500 photos per guest
+  (decided 2026-10-22, so the couple can't be billed).
 - The page is a column grid (one column on phones, up to three on desktop) of cream-framed
   photos. Tapping one opens it full size in a lightbox with Previous/Next, arrow keys, swipe and
   Esc; focus returns to the photo's thumbnail.
@@ -99,11 +102,24 @@ accessibility); registry and other. Each entry appears only when its answer is i
   real labyrinth's mouth is. The other animal waits in the center; reaching it ends the game
   with a heart and the move count. "Walk it again" starts a new maze.
 - Brick-red walls (like the real labyrinth's brick lines) on an espresso ground inside a thin
-  cream rim. Arrow keys/WASD, swipe, or the on-screen pad move the animal.
-- On a circle "up" means different passages in different places, so each cell pairs its open
-  passages with the arrow keys that point most nearly along them, one key per passage. To make
-  that always possible, a cell has at most one outward passage (four passages at most), and the
-  center has exactly one way in.
+  cream rim.
+- The player drags their animal anywhere it fits. Walls are solid: the animal is a circle that
+  stops at a wall and slides along it when dragged at an angle, the way a marble rolls along an
+  edge. The collision lines are the drawn walls, thickness included. A drag has to start on
+  the animal. Arrow keys/WASD nudge it in screen directions, with the same collisions, for
+  keyboard users. Reaching the center with the ring wins; the message gives the time in seconds.
+- Each cell has at most one outward passage, so the center has exactly one way in.
+- A gold wedding ring, glowing softly, waits at the end of a side branch off the route to the
+  center. The branch is the dead end whose length off the route comes closest to a third of the
+  route (at least 4 cells), so it's a real detour but not a second maze. A gold-barred gate
+  shuts the center's doorway until the animal picks up the ring; then the gate disappears and
+  the animal carries the ring to the center. Bumping the shut gate says "Find the ring first."
+- Status messages call the maze's rings "circuits" (the labyrinth word), so "ring" only ever
+  means the wedding ring.
+- Fall leaves (about 150, in rust, amber, ochre and oxblood, slightly see-through) lie on the
+  floor, clear of the walls and the center cell. The animal kicks the ones in its path: they
+  skid the way it moved, scatter a little to the sides, spin, and settle within about a second.
+  Walls stop them just as they stop the animal. They are scattered fresh for each maze.
 - Optional `Labyrinth intro` in DETAILS.md shows on the start screen.
 
 ## Privacy

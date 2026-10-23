@@ -25,7 +25,9 @@ export type FactLabel =
   | "Photo policy"
   | "Things to do nearby";
 
-export type Topic = "Getting there" | "Lodging" | "The day of" | "Registry & more";
+/** Q&A page sections, in page order. */
+export const TOPICS = ["Getting there", "Lodging", "The day of", "Registry & more"] as const;
+export type Topic = (typeof TOPICS)[number];
 
 export interface QaEntry {
   topic: Topic;

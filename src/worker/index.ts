@@ -2,22 +2,32 @@ import { Hono } from "hono";
 import { secureHeaders } from "hono/secure-headers";
 import { admin } from "@worker/admin.ts";
 import type { Env } from "@worker/env.ts";
+import { adminPhotos, media, photos } from "@worker/photos.ts";
+import { adminQuestions, questions } from "@worker/questions.ts";
 import { registry, stripeWebhook } from "@worker/registry.ts";
 import { rsvp } from "@worker/rsvp.ts";
 
-const app = new Hono<{ Bindings: Env }>().basePath("/api");
+const api = new Hono<{ Bindings: Env }>();
 
-app.use("*", secureHeaders());
-app.use("*", async (c, next) => {
+api.use("*", secureHeaders());
+api.use("*", async (c, next) => {
   await next();
   c.header("Cache-Control", "no-store");
   c.header("X-Robots-Tag", "noindex, nofollow");
 });
 
-app.route("/rsvp", rsvp);
-app.route("/admin", admin);
-app.route("/registry", registry);
-app.route("/stripe", stripeWebhook);
+api.route("/rsvp", rsvp);
+api.route("/admin/photos", adminPhotos);
+api.route("/admin/questions", adminQuestions);
+api.route("/admin", admin);
+api.route("/photos", photos);
+api.route("/questions", questions);
+api.route("/registry", registry);
+api.route("/stripe", stripeWebhook);
+
+const app = new Hono<{ Bindings: Env }>();
+app.route("/api", api);
+app.route("/media", media);
 
 app.notFound((c) => c.json({ error: "Not found." }, 404));
 app.onError((error, c) => {

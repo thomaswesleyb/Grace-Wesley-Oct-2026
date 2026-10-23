@@ -1,4 +1,4 @@
-import { byName, isPhoto, uniqueSlugs } from "./gallery.ts";
+import { byName, isPhoto, uniqueSlugs } from "./photo-files.ts";
 
 export interface PlannedBackdrop {
   /** File name in background-images/. */

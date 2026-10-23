@@ -88,3 +88,74 @@
 .lightbox-controls .button {
   padding-inline: 1rem;
 }
+
+.photo-credit {
+  display: block;
+  font-size: 0.85rem;
+  font-style: italic;
+}
+
+.photos-subheading {
+  margin: 2.5rem 0 1rem;
+  font-size: 1.5rem;
+  text-align: center;
+  color: var(--sepia-300);
+}
+
+/* Uploading, on the Photos page and /admin/photos */
+.photo-drop {
+  display: grid;
+  gap: 0.35rem;
+  justify-items: center;
+  padding: 2rem 1rem;
+  text-align: center;
+  border: 2px dashed var(--sepia-400);
+  border-radius: var(--radius);
+  cursor: pointer;
+  transition: background 150ms ease;
+}
+
+.photo-drop:hover,
+.photo-drop.over {
+  background: rgb(239 230 214 / 0.08);
+}
+
+.photo-drop:focus-within {
+  outline: 2px solid var(--sepia-300);
+  outline-offset: 2px;
+}
+
+.photo-drop.disabled {
+  opacity: 0.55;
+  cursor: progress;
+}
+
+.photo-drop-label {
+  font-size: 1.15rem;
+}
+
+.photo-drop-hint {
+  font-size: 0.9rem;
+  color: var(--sepia-300);
+}
+
+.upload-status {
+  margin-top: 1rem;
+  text-align: center;
+}
+
+.upload-status ul {
+  margin: 0.5rem 0 0;
+  padding: 0;
+  list-style: none;
+  text-align: left;
+}
+
+.guest-upload {
+  margin-top: 3rem;
+}
+
+.guest-upload h2 {
+  margin: 0 0 0.5rem;
+  text-align: center;
+}

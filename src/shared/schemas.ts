@@ -1,4 +1,6 @@
 import { z } from "zod";
+import { TOPICS } from "@content/qa.ts";
+import { LARGE_EDGE } from "@shared/photos.ts";
 
 const personName = z.string().trim().min(1).max(60);
 const optionalText = (max: number) =>
@@ -165,3 +167,100 @@ export const checkoutRequest = z.object({
 export type CheckoutRequest = z.input<typeof checkoutRequest>;
 
 export const checkoutResponse = z.object({ url: z.url() });
+
+export const galleryPhoto = z.object({
+  id: z.string(),
+  alt: z.string(),
+  caption: z.string().nullable(),
+  /** The guest who shared it, by their guest-list name; null for the couple's own photos. */
+  credit: z.string().nullable(),
+  /** The large copy, up to LARGE_EDGE px on its long side; `width` and `height` are its size. */
+  src: z.string(),
+  width: z.number().int(),
+  height: z.number().int(),
+  /** A copy up to SMALL_WIDTH px wide (the same file as `src` when the photo is that small). */
+  small: z.object({ src: z.string(), width: z.number().int() }),
+});
+export type GalleryPhoto = z.infer<typeof galleryPhoto>;
+
+export const photosResponse = z.object({
+  /** The couple's photos, in their chosen order. */
+  photos: z.array(galleryPhoto),
+  /** Guests' photos the couple approved, oldest first. */
+  guestPhotos: z.array(galleryPhoto),
+  /** True while guests may upload photos. */
+  uploadsOpen: z.boolean(),
+});
+export type PhotosResponse = z.infer<typeof photosResponse>;
+
+export const adminPhoto = galleryPhoto.extend({
+  /** The description as entered; empty when `alt` is the generic one. */
+  altText: z.string(),
+  source: z.enum(["couple", "guest"]),
+  status: z.enum(["pending", "approved"]),
+  createdAt: z.string(),
+});
+export type AdminPhoto = z.infer<typeof adminPhoto>;
+
+export const adminPhotosResponse = z.object({
+  /** The couple's photos in order, then guests' photos oldest first. */
+  photos: z.array(adminPhoto),
+  uploadsOpen: z.boolean(),
+  /** Bytes stored for every photo, pending ones included, and the most allowed. */
+  storage: z.object({ usedBytes: z.number().int(), limitBytes: z.number().int() }),
+});
+export type AdminPhotosResponse = z.infer<typeof adminPhotosResponse>;
+
+const pixels = z.coerce.number().int().min(1).max(LARGE_EDGE);
+
+/** The text fields sent with an upload's `large` and optional `small` files. */
+export const photoUploadFields = z.object({
+  width: pixels,
+  height: pixels,
+  alt: z.string().trim().max(300).default(""),
+  caption: optionalText(300),
+});
+
+export const guestPhotoUploadFields = photoUploadFields.extend({
+  firstName: personName,
+  lastName: personName,
+});
+
+export const photoUploadResult = z.object({
+  id: z.string(),
+  status: z.enum(["pending", "approved"]),
+});
+
+/** Only the fields sent change. An empty caption clears it. */
+export const photoEdit = z.object({
+  alt: z.string().trim().max(300).optional(),
+  caption: z
+    .string()
+    .trim()
+    .max(300)
+    .transform((v) => (v.length === 0 ? null : v))
+    .nullable()
+    .optional(),
+  /** Guests' photos start as pending; approving one shows it on the Photos page. */
+  status: z.literal("approved").optional(),
+});
+export type PhotoEdit = z.input<typeof photoEdit>;
+
+export const photoOrder = z.object({ ids: z.array(z.string().min(1).max(64)).min(1).max(1000) });
+
+export const photoUploadsSetting = z.object({ open: z.boolean() });
+
+/** A Q&A entry the couple adds from /admin/questions, on top of those from DETAILS.md. */
+export const questionFields = z.object({
+  topic: z.enum(TOPICS),
+  question: z.string().trim().min(1).max(200),
+  answer: z.string().trim().min(1).max(2000),
+});
+export type QuestionFields = z.input<typeof questionFields>;
+
+export const addedQuestion = questionFields.extend({ id: z.string(), createdAt: z.string() });
+export type AddedQuestion = z.infer<typeof addedQuestion>;
+
+/** Oldest first. */
+export const questionsResponse = z.object({ questions: z.array(addedQuestion) });
+export type QuestionsResponse = z.infer<typeof questionsResponse>;

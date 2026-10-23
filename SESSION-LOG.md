@@ -6,6 +6,37 @@ setup steps in `README.md`, and your step-by-step launch plan in `LAUNCH-TODO.md
 
 ---
 
+## 2026-10-22: Photos from the cloud, and guest photo sharing
+
+### Decisions (and why)
+
+- **Photos live in R2 and D1, not the build.** The couple wanted to add photos without a
+  redeploy. They drag photos onto `/admin/photos`; the browser resizes them (the Worker can't
+  run ImageMagick), and the Worker stores them. Replaces `images/` + `pnpm gen:gallery`.
+- **Guests can share photos after the wedding.** It's off until the couple opens it in admin. A
+  guest must match the guest list (the RSVP's name matching), and every photo waits for
+  approval before anyone else can see it.
+- **Guest uploads go to R2 for now.** Sending them to Google (Drive or Cloud Storage) instead
+  was discussed but not decided.
+
+### What was built
+
+| Area | Where |
+|---|---|
+| API: list, guest upload, admin manage, `/media` serving | `src/worker/photos.ts`, `src/worker/db.ts` |
+| Resizing and upload in the browser | `src/client/photos/upload.ts`, `PhotoDrop.tsx` |
+| Photos page, gallery and guest form | `src/client/pages/Photos.tsx`, `src/client/photos/` |
+| Admin photos page | `src/client/pages/AdminPhotos.tsx` |
+| Database | `migrations/0006_photos.sql` |
+| One-time import of the 20 built-in photos | `scripts/import-gallery.ts` |
+
+### Still open
+
+- Production: create the bucket, migrate, import, deploy (`LAUNCH-TODO.md` step 4). Then delete
+  the old gallery files and the import script.
+
+---
+
 ## 2026-10-19 (later): Photos and Labyrinth pages
 
 Both pages ship at the Oct 23 launch. Neither needs the backend or the database.

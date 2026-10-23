@@ -2,17 +2,15 @@ import * as fc from "fast-check";
 import { describe, expect, it } from "vitest";
 import {
   CENTER,
-  type Direction,
   type Maze,
   RINGS,
+  cellAt,
   cellCenter,
   generateMaze,
-  move,
   neighbors,
   ringSizes,
+  route,
 } from "@client/labyrinth/maze.ts";
-
-const DIRECTIONS: Direction[] = ["up", "down", "left", "right"];
 
 function cellCount(maze: Maze): number {
   return maze.links.length;
@@ -41,17 +39,6 @@ function passageCount(maze: Maze): number {
 
 function flat(maze: Maze): number[][] {
   return maze.links.map((set) => [...set].toSorted((a, b) => a - b));
-}
-
-/** A maze whose only passages are the given pairs, on the standard grid. */
-function mazeWith(pairs: [number, number][]): Maze {
-  const base = generateMaze(1);
-  const links = base.links.map(() => new Set<number>());
-  for (const [a, b] of pairs) {
-    links[a]?.add(b);
-    links[b]?.add(a);
-  }
-  return { ...base, links };
 }
 
 describe("ringSizes", () => {
@@ -104,13 +91,41 @@ describe("generateMaze", () => {
     expect(y).toBeCloseTo(RINGS + 0.5);
   });
 
-  it("gives no cell more passages than there are arrow keys, and the center one", () => {
+  it("gives the center exactly one way in", () => {
     fc.assert(
       fc.property(fc.integer(), (seed) => {
         const maze = generateMaze(seed);
-        for (const set of maze.links) expect(set.size).toBeLessThanOrEqual(4);
         expect(maze.links[CENTER]?.size).toBe(1);
       }),
+    );
+  });
+
+  it("hides the wedding ring in a dead end off the route to the center", () => {
+    fc.assert(
+      fc.property(fc.integer(), (seed) => {
+        const maze = generateMaze(seed);
+        expect(maze.links[maze.weddingRing]?.size).toBe(1);
+        expect(route(maze.links, maze.entrance, CENTER)).not.toContain(maze.weddingRing);
+      }),
+    );
+  });
+
+  it("picks the ring's dead end so the detour is about a third of the route", () => {
+    fc.assert(
+      fc.property(fc.integer(), (seed) => {
+        const maze = generateMaze(seed);
+        const toCenter = route(maze.links, maze.entrance, CENTER);
+        const detour = (cell: number) =>
+          route(maze.links, maze.entrance, cell).filter((c) => !toCenter.includes(c)).length;
+        const target = Math.max(4, Math.round(toCenter.length / 3));
+        const miss = (cell: number) => Math.abs(detour(cell) - target);
+        const deadEnds = maze.links
+          .map((set, cell) => ({ set, cell }))
+          .filter(({ set, cell }) => set.size === 1 && detour(cell) > 0)
+          .map(({ cell }) => cell);
+        expect(miss(maze.weddingRing)).toBe(Math.min(...deadEnds.map(miss)));
+      }),
+      { numRuns: 30 },
     );
   });
 
@@ -121,70 +136,45 @@ describe("generateMaze", () => {
   });
 });
 
-describe("move", () => {
-  it("never passes through a wall", () => {
-    fc.assert(
-      fc.property(
-        fc.integer(),
-        fc.array(fc.constantFrom(...DIRECTIONS), { maxLength: 200 }),
-        (seed, presses) => {
-          const maze = generateMaze(seed);
-          let at = maze.entrance;
-          for (const direction of presses) {
-            const next = move(maze, at, direction);
-            if (next !== at) expect(maze.links[at]?.has(next)).toBe(true);
-            at = next;
-          }
-        },
-      ),
-    );
+describe("route", () => {
+  it("walks open passages from one cell to the other", () => {
+    const maze = generateMaze(8);
+    const path = route(maze.links, maze.entrance, CENTER);
+    expect(path[0]).toBe(maze.entrance);
+    expect(path.at(-1)).toBe(CENTER);
+    path.slice(1).forEach((cell, i) => expect(maze.links[path[i] ?? -1]?.has(cell)).toBe(true));
+    expect(route(maze.links, CENTER, CENTER)).toEqual([CENTER]);
   });
 
-  it("can take every open passage with some arrow key", () => {
+  it("fails clearly when the cells aren't connected", () => {
+    const maze = generateMaze(8);
+    const sealed = maze.links.map(() => new Set<number>());
+    expect(() => route(sealed, maze.entrance, CENTER)).toThrow(/No route/);
+  });
+});
+
+describe("cellAt", () => {
+  it("finds every cell at its own center", () => {
     fc.assert(
-      fc.property(fc.integer(), (seed) => {
+      fc.property(fc.integer({ min: 0, max: 2 ** 32 - 1 }), (seed) => {
         const maze = generateMaze(seed);
-        maze.links.forEach((set, cell) => {
-          const reached = new Set(DIRECTIONS.map((d) => move(maze, cell, d)));
-          for (const next of set) expect(reached).toContain(next);
-        });
+        for (let cell = 0; cell < cellCount(maze); cell++) {
+          expect(cellAt(maze, cellCenter(maze, cell))).toBe(cell);
+        }
       }),
+      { numRuns: 5 },
     );
   });
 
-  it("maps screen directions at the bottom of the board", () => {
-    const base = generateMaze(1);
-    const entrance = base.entrance;
-    const [clockwise, counterclockwise, inward] = neighbors(base, entrance) as [
-      number,
-      number,
-      number,
-    ];
-    const maze = mazeWith([
-      [entrance, inward],
-      [entrance, clockwise],
-      [entrance, counterclockwise],
-    ]);
-    expect(move(maze, entrance, "up")).toBe(inward);
-    expect(cellCenter(maze, move(maze, entrance, "left")).x).toBeLessThan(0);
-    expect(cellCenter(maze, move(maze, entrance, "right")).x).toBeGreaterThan(0);
-    expect(move(maze, entrance, "down")).toBe(entrance);
+  it("puts the bottom of the outer ring at the entrance", () => {
+    const maze = generateMaze(1);
+    expect(cellAt(maze, { x: 0, y: RINGS + 0.5 })).toBe(maze.entrance);
   });
 
-  it("stays put when nothing lies that way", () => {
-    const base = generateMaze(1);
-    const inward = neighbors(base, base.entrance)[2] ?? -1;
-    const maze = mazeWith([[base.entrance, inward]]);
-    expect(move(maze, base.entrance, "up")).toBe(inward);
-    expect(move(maze, base.entrance, "down")).toBe(base.entrance);
-    expect(move(maze, base.entrance, "left")).toBe(base.entrance);
-  });
-
-  it("reaches the center from ring 1", () => {
-    const base = generateMaze(1);
-    const top = neighbors(base, CENTER).find((cell) => cellCenter(base, cell).y < -1);
-    expect(top).toBeDefined();
-    const maze = mazeWith([[CENTER, top ?? -1]]);
-    expect(move(maze, top ?? -1, "down")).toBe(CENTER);
+  it("returns the center inside radius 1 and null beyond the outer wall", () => {
+    const maze = generateMaze(1);
+    expect(cellAt(maze, { x: 0.3, y: -0.4 })).toBe(CENTER);
+    expect(cellAt(maze, { x: 0, y: RINGS + 1 })).toBeNull();
+    expect(cellAt(maze, { x: -RINGS - 2, y: 0 })).toBeNull();
   });
 });

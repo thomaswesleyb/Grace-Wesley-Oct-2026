@@ -1,9 +1,11 @@
 import type { NameCandidate } from "@shared/names.ts";
 import type {
+  AddedQuestion,
   AdminContribution,
   AdminGuest,
   AdminRsvp,
   ParsedRsvpSubmission,
+  QuestionFields,
   RegistryItem,
 } from "@shared/schemas.ts";
 
@@ -245,4 +247,177 @@ export async function listPaidContributions(db: D1Database): Promise<AdminContri
     email: c.email,
     createdAt: c.created_at,
   }));
+}
+
+export async function setSetting(db: D1Database, key: string, value: string): Promise<void> {
+  await db
+    .prepare(
+      "INSERT INTO settings (key, value) VALUES (?, ?) ON CONFLICT (key) DO UPDATE SET value = ?",
+    )
+    .bind(key, value, value)
+    .run();
+}
+
+export interface PhotoRow {
+  id: string;
+  source: "couple" | "guest";
+  status: "pending" | "approved";
+  guest_id: string | null;
+  credit: string | null;
+  alt: string;
+  caption: string | null;
+  width: number;
+  height: number;
+  has_small: 0 | 1;
+  /** Both copies together. */
+  bytes: number;
+  created_at: string;
+}
+
+/** The couple's photos in their order, then guests' photos oldest first. */
+export async function listPhotos(db: D1Database, only?: PhotoRow["status"]): Promise<PhotoRow[]> {
+  const where = only === undefined ? "" : "WHERE status = ?";
+  const statement = db.prepare(
+    `SELECT * FROM photos ${where} ORDER BY source = 'guest', sort, created_at, rowid`,
+  );
+  const { results } = await (only === undefined ? statement : statement.bind(only)).all<PhotoRow>();
+  return results;
+}
+
+export async function getPhoto(db: D1Database, id: string): Promise<PhotoRow | null> {
+  return db.prepare("SELECT * FROM photos WHERE id = ?").bind(id).first<PhotoRow>();
+}
+
+export interface PhotoLimits {
+  totalBytes: number;
+  guestBytes: number;
+  guestPhotos: number;
+}
+
+/**
+ * Adds a photo, unless it would break `limits`; returns false then. The check and the insert
+ * are one statement, so two uploads at once can't both squeeze past a limit. The couple's
+ * photos go after their others; guests' sort by upload time.
+ */
+export async function insertPhoto(
+  db: D1Database,
+  photo: PhotoRow,
+  limits: PhotoLimits,
+): Promise<boolean> {
+  const result = await db
+    .prepare(
+      `INSERT INTO photos
+         (id, source, status, guest_id, credit, alt, caption, width, height, has_small, bytes,
+          sort, created_at)
+       SELECT ?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11,
+         (SELECT COALESCE(MAX(sort), -1) + 1 FROM photos WHERE source = ?2), ?12
+       WHERE (SELECT COALESCE(SUM(bytes), 0) FROM photos) + ?11 <= ?13
+         AND (?4 IS NULL OR (
+           (SELECT COALESCE(SUM(bytes), 0) FROM photos WHERE guest_id = ?4) + ?11 <= ?14
+           AND (SELECT COUNT(*) FROM photos WHERE guest_id = ?4) < ?15))`,
+    )
+    .bind(
+      photo.id,
+      photo.source,
+      photo.status,
+      photo.guest_id,
+      photo.credit,
+      photo.alt,
+      photo.caption,
+      photo.width,
+      photo.height,
+      photo.has_small,
+      photo.bytes,
+      photo.created_at,
+      limits.totalBytes,
+      limits.guestBytes,
+      limits.guestPhotos,
+    )
+    .run();
+  return result.meta.changes === 1;
+}
+
+/** Bytes stored for all photos, and one guest's bytes and photo count (0 for no guest). */
+export async function photoUsage(db: D1Database, guestId: string | null) {
+  const row = await db
+    .prepare(
+      `SELECT COALESCE(SUM(bytes), 0) AS total_bytes,
+         COALESCE(SUM(CASE WHEN guest_id = ?1 THEN bytes END), 0) AS guest_bytes,
+         COUNT(CASE WHEN guest_id = ?1 THEN 1 END) AS guest_photos
+       FROM photos`,
+    )
+    .bind(guestId)
+    .first<{ total_bytes: number; guest_bytes: number; guest_photos: number }>();
+  return {
+    totalBytes: row?.total_bytes ?? 0,
+    guestBytes: row?.guest_bytes ?? 0,
+    guestPhotos: row?.guest_photos ?? 0,
+  };
+}
+
+/** Changes only the fields given. Returns false when there's no photo with that id. */
+export async function updatePhoto(
+  db: D1Database,
+  id: string,
+  edit: { [K in "alt" | "caption" | "status"]?: PhotoRow[K] | undefined },
+): Promise<boolean> {
+  const fields = Object.entries(edit).filter(([, value]) => value !== undefined);
+  if (fields.length === 0) return (await getPhoto(db, id)) !== null;
+  const sets = fields.map(([column]) => `${column} = ?`).join(", ");
+  const result = await db
+    .prepare(`UPDATE photos SET ${sets} WHERE id = ?`)
+    .bind(...fields.map(([, value]) => value), id)
+    .run();
+  return result.meta.changes === 1;
+}
+
+export async function deletePhoto(db: D1Database, id: string): Promise<boolean> {
+  const result = await db.prepare("DELETE FROM photos WHERE id = ?").bind(id).run();
+  return result.meta.changes === 1;
+}
+
+/** Puts the couple's photos in the order of `ids`. Ids of guests' photos are ignored. */
+export async function reorderPhotos(db: D1Database, ids: string[]): Promise<void> {
+  await db.batch(
+    ids.map((id, sort) =>
+      db.prepare("UPDATE photos SET sort = ? WHERE id = ? AND source = 'couple'").bind(sort, id),
+    ),
+  );
+}
+
+export async function listQuestions(db: D1Database): Promise<AddedQuestion[]> {
+  const { results } = await db
+    .prepare(
+      `SELECT id, topic, question, answer, created_at AS createdAt FROM questions
+       ORDER BY created_at, rowid`,
+    )
+    .all<AddedQuestion>();
+  return results;
+}
+
+export async function insertQuestion(db: D1Database, question: AddedQuestion): Promise<void> {
+  await db
+    .prepare(
+      "INSERT INTO questions (id, topic, question, answer, created_at) VALUES (?, ?, ?, ?, ?)",
+    )
+    .bind(question.id, question.topic, question.question, question.answer, question.createdAt)
+    .run();
+}
+
+/** Returns false when there's no question with that id. */
+export async function updateQuestion(
+  db: D1Database,
+  id: string,
+  fields: QuestionFields,
+): Promise<boolean> {
+  const result = await db
+    .prepare("UPDATE questions SET topic = ?, question = ?, answer = ? WHERE id = ?")
+    .bind(fields.topic, fields.question, fields.answer, id)
+    .run();
+  return result.meta.changes === 1;
+}
+
+export async function deleteQuestion(db: D1Database, id: string): Promise<boolean> {
+  const result = await db.prepare("DELETE FROM questions WHERE id = ?").bind(id).run();
+  return result.meta.changes === 1;
 }

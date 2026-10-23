@@ -43,4 +43,5 @@
   margin: 0 0.25rem 1rem;
   font-family: Georgia, "Times New Roman", serif;
   color: var(--cream-50);
+  white-space: pre-line;
 }

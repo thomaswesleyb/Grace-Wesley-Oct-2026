@@ -10,8 +10,6 @@
 export const RINGS = 7;
 export const CENTER = 0;
 
-export type Direction = "up" | "down" | "left" | "right";
-
 export interface Maze {
   /** Cells in each ring; ring 0 is the center and always has 1. */
   ringSizes: readonly number[];
@@ -21,6 +19,8 @@ export interface Maze {
   links: readonly ReadonlySet<number>[];
   /** The outer-ring cell at the bottom, where the player enters. */
   entrance: number;
+  /** The dead end holding the wedding ring, off the route from the entrance to the center. */
+  weddingRing: number;
   /** Rotation that centers the entrance cell at the bottom of the board. */
   angleOffset: number;
 }
@@ -143,15 +143,73 @@ function carvePassages(grid: Grid, start: number, random: () => number): Set<num
 }
 
 /**
- * Carves a perfect maze from the entrance. Each cell gets at most one outward passage, so no
- * cell has more than four (one per arrow key), and the center has exactly one way in.
+ * Carves a perfect maze from the entrance. Each cell gets at most one outward passage, so the
+ * center has exactly one way in.
  */
 export function generateMaze(seed: number, rings = RINGS): Maze {
   const grid = buildGrid(rings);
   const outer = sizeOf(grid, rings);
   const entrance = startOf(grid, rings) + Math.floor(outer / 4);
   const links = carvePassages(grid, entrance, seededRandom(seed));
-  return { ...grid, links, entrance, angleOffset: -Math.PI / outer };
+  const weddingRing = detourDeadEnd(links, route(links, entrance, CENTER));
+  return { ...grid, links, entrance, weddingRing, angleOffset: -Math.PI / outer };
+}
+
+/** Steps through open passages from every source cell; distance[cell] is -1 if unreached. */
+function distancesFrom(links: Maze["links"], sources: readonly number[]): number[] {
+  const distance = links.map(() => -1);
+  for (const source of sources) distance[source] = 0;
+  const queue = [...sources];
+  for (let head = 0; head < queue.length; head++) {
+    const cell = queue[head] ?? CENTER;
+    for (const next of links[cell] ?? []) {
+      if (distance[next] !== -1) continue;
+      distance[next] = (distance[cell] ?? 0) + 1;
+      queue.push(next);
+    }
+  }
+  return distance;
+}
+
+/** The cells on the only route between two cells of a perfect maze, both ends included. */
+export function route(links: Maze["links"], from: number, to: number): number[] {
+  const distance = distancesFrom(links, [to]);
+  const path = [from];
+  let at = from;
+  while (at !== to) {
+    const here = distance[at] ?? -1;
+    const next = [...(links[at] ?? [])].find((cell) => distance[cell] === here - 1);
+    if (next === undefined) throw new Error(`No route from cell ${from} to cell ${to}.`);
+    path.push(next);
+    at = next;
+  }
+  return path;
+}
+
+/** The ring's branch aims for this share of the main route's length, so the detour is fair. */
+const DETOUR_SHARE = 1 / 3;
+const MIN_DETOUR = 4;
+
+/**
+ * The dead end whose branch off `path` comes closest to a third of the path's length (the
+ * longer one on a tie), so fetching the ring is a real detour but not a second maze.
+ */
+function detourDeadEnd(links: Maze["links"], path: readonly number[]): number {
+  const distance = distancesFrom(links, path);
+  const target = Math.max(MIN_DETOUR, Math.round(path.length * DETOUR_SHARE));
+  let best = -1;
+  let bestMiss = Infinity;
+  links.forEach((set, cell) => {
+    const off = distance[cell] ?? 0;
+    const miss = Math.abs(off - target);
+    if (set.size !== 1 || off === 0) return;
+    if (miss < bestMiss || (miss === bestMiss && off > (distance[best] ?? 0))) {
+      best = cell;
+      bestMiss = miss;
+    }
+  });
+  if (best === -1) throw new Error("The maze has no dead end off the route for the ring.");
+  return best;
 }
 
 /** The angles where a ring cell starts and ends. */
@@ -171,73 +229,13 @@ export function cellCenter(maze: Maze, cell: number): Point {
   return { x: radius * Math.cos(angle), y: radius * Math.sin(angle) };
 }
 
-const DIRECTION_VECTORS: Record<Direction, Point> = {
-  up: { x: 0, y: -1 },
-  down: { x: 0, y: 1 },
-  left: { x: -1, y: 0 },
-  right: { x: 1, y: 0 },
-};
-
-const DIRECTIONS = Object.keys(DIRECTION_VECTORS) as Direction[];
-
-/** A spare key also reaches a passage within 60° of it. */
-const MIN_ALIGNMENT = Math.cos(Math.PI / 3);
-
-/** How closely each passage out of `from` lines up with each key, from -1 to 1. */
-function alignments(maze: Maze, from: number): { cell: number; scores: number[] }[] {
-  const here = cellCenter(maze, from);
-  return [...(maze.links[from] ?? [])].map((cell) => {
-    const there = cellCenter(maze, cell);
-    const dx = there.x - here.x;
-    const dy = there.y - here.y;
-    const length = Math.hypot(dx, dy);
-    const scores = DIRECTIONS.map((d) => {
-      const v = DIRECTION_VECTORS[d];
-      return (dx * v.x + dy * v.y) / length;
-    });
-    return { cell, scores };
-  });
-}
-
-/** Gives each passage its own key, choosing the pairing that lines up best overall. */
-function assignKeys(passages: { scores: number[] }[], taken: number[] = []): number[] {
-  const index = taken.length;
-  const passage = passages[index];
-  if (passage === undefined) return taken;
-  let best: number[] = [];
-  let bestTotal = -Infinity;
-  for (let key = 0; key < DIRECTIONS.length; key++) {
-    if (taken.includes(key)) continue;
-    const pairing = assignKeys(passages, [...taken, key]);
-    const total = pairing.reduce((sum, k, p) => sum + (passages[p]?.scores[k] ?? 0), 0);
-    if (total > bestTotal) {
-      best = pairing;
-      bestTotal = total;
-    }
-  }
-  return best;
-}
-
-/**
- * Moves through the open passage that matches a screen direction. On a circle "up" means
- * different passages in different places, so each passage out of the cell is paired with the
- * key that points most nearly along it, every passage getting a key of its own. A key left
- * over still reaches a passage within 60° of it. Returns `from` when nothing lies that way.
- */
-export function move(maze: Maze, from: number, direction: Direction): number {
-  const passages = alignments(maze, from);
-  const pressed = DIRECTIONS.indexOf(direction);
-  const keys = assignKeys(passages);
-  const assigned = keys.indexOf(pressed);
-  if (assigned >= 0) return passages[assigned]?.cell ?? from;
-  let best = from;
-  let bestScore = MIN_ALIGNMENT;
-  for (const { cell, scores } of passages) {
-    const score = scores[pressed] ?? -1;
-    if (score > bestScore) {
-      best = cell;
-      bestScore = score;
-    }
-  }
-  return best;
+/** The cell under a point in maze units, or null when the point is outside the maze. */
+export function cellAt(maze: Maze, point: Point): number | null {
+  const ring = Math.floor(Math.hypot(point.x, point.y));
+  if (ring === CENTER) return CENTER;
+  const size = sizeOf(maze, ring);
+  if (size === 0) return null;
+  const turn = 2 * Math.PI;
+  const angle = (((Math.atan2(point.y, point.x) - maze.angleOffset) % turn) + turn) % turn;
+  return startOf(maze, ring) + (Math.floor((angle / turn) * size) % size);
 }

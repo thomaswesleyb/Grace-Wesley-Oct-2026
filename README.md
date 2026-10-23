@@ -13,12 +13,12 @@ Requires Node 22 (`nvm use 22`) and pnpm 12.
 | `pnpm install` | Install pinned dependencies (install scripts blocked) |
 | `pnpm dev` | Local site + API at http://localhost:5173 (local D1) |
 | `pnpm gen` | Rebuild `content/details.json` from `DETAILS.md`; lists hidden Q&A entries |
-| `pnpm gen:gallery` | Make web copies of every photo in `images/` and rebuild `content/gallery.json` (`dev` and `build` run it too); needs ImageMagick. Optional `images/captions.csv` (`file,caption,alt`) adds captions, descriptions and order |
 | `pnpm gen:backdrops` | Make blurred-backdrop copies of every photo in `background-images/` and rebuild `content/backdrops.json` (`dev` and `build` run it too). Every page except Home and admin picks one at random |
 | `pnpm check` | Lint, format check, type check, tests |
 | `pnpm db:migrate:local` / `db:migrate:remote` | Apply `migrations/` to the local or production database |
 | `pnpm seed:guests --local\|--remote [file.csv]` | Load or update the guest list (default `guest-list.csv`) |
 | `pnpm seed:registry --local\|--remote [file.csv]` | Load or update registry items (default `wedding-registry.csv`) |
+| `pnpm photos:import --local\|--remote` | One time: copy the photos that used to be built into the site (`content/gallery.json`) into R2 and D1. Refuses if the photos table isn't empty |
 | `pnpm deploy` | Build and deploy to Cloudflare |
 
 Site facts come from `DETAILS.md`. Edit it, then run `pnpm gen` (dev and build run it for you).
@@ -64,13 +64,42 @@ Contribute buttons are disabled.
 To hide the page before launch, remove the Registry link in `src/client/components/Layout.tsx`
 (the route in `src/client/main.tsx` can stay).
 
+## Photos
+
+The Photos page loads its photos from the API, so new photos show up without a deploy.
+
+- **Your photos:** drag them onto `/admin/photos` (phone or computer). The browser makes a WebP
+  copy up to 1600 px and an 800 px copy for wider photos (JPEG on Safari), fixing rotation and
+  dropping metadata such as GPS location. The originals never leave your device. The copies go
+  to the `wedding-photos` R2 bucket, and the caption, description and order go to the D1
+  `photos` table. On the same page you can edit captions and descriptions, reorder and delete.
+- **Guests' photos:** closed until you press "Open guest sharing" on `/admin/photos`. Then the
+  Photos page shows a form. A guest enters their name as it's on the guest list (same matching as
+  the RSVP; strangers and 0-place guests get the same "not found" reply) and picks photos. Each
+  one waits under "Waiting for approval" and isn't served to anyone else until you approve it.
+  Uploads are limited to 30 a minute per IP.
+- **Storage limits** (`src/shared/photos.ts`) keep R2 inside its free 10 GB: uploads stop at
+  8 GB in all (the couple's included), 300 MB or 500 photos per guest. The limit check and the
+  database insert are one statement, and nothing reaches R2 until the row is in, so a refused
+  upload costs nothing. Deleting photos frees space. `/admin/photos` shows the total used.
+- Files are served from `/media/photos/<id>/(large|small)`, approved photos only. Pending ones
+  are previewed through `/api/admin/photos/<id>/…`, behind Access.
+
+## Q&A
+
+Questions come from two places. The ones in `content/qa.ts` get their answers from
+`DETAILS.md` and change only with a deploy. Questions added on `/admin/questions` are stored in
+the D1 `questions` table and appear on the Q&A page right away, after the `DETAILS.md` ones in
+the same topic. You can edit or delete the added ones on that page. The `DETAILS.md` ones are
+shown there read-only.
+
 ## First deploy (one time)
 
 1. Register `parkhillbaileywedding.com` (Cloudflare Registrar) and add it to the Cloudflare account.
 2. `pnpm exec wrangler login`
 3. `pnpm exec wrangler d1 create wedding`, then paste the printed `database_id` into
    `wrangler.jsonc`.
-4. `pnpm db:migrate:remote`
+4. `pnpm exec wrangler r2 bucket create wedding-photos`, then `pnpm db:migrate:remote`
 5. `pnpm seed:guests --remote` to load `guest-list.csv`.
 6. `pnpm deploy`, then attach the custom domain to the Worker in the Cloudflare dashboard.
 7. **Protect admin:** Zero Trust → Access → Applications → self-hosted app for
