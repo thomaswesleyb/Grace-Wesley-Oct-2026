@@ -197,6 +197,11 @@
   font-size: 0.85rem;
 }
 
+.admin-question.off .admin-question-q,
+.admin-question.off .admin-question-a {
+  opacity: 0.6;
+}
+
 .admin-question-form {
   max-width: 40rem;
 }

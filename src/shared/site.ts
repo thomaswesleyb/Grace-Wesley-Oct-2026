@@ -21,5 +21,6 @@ export interface SiteContent {
   /** "Photos intro" and "Labyrinth intro" from DETAILS.md; each page omits its intro until set. */
   photosIntro: string | null;
   labyrinthIntro: string | null;
-  qa: { topic: Topic; question: string; answer: string }[];
+  /** Every entry in content/qa.ts; `answer` is null while DETAILS.md lacks a fact it needs. */
+  qa: { key: string; topic: Topic; question: string; answer: string | null }[];
 }

@@ -284,7 +284,8 @@ export function Admin() {
       <h1>RSVPs</h1>
       <p className="admin-nav">
         <Link to="/admin/photos">Manage photos →</Link> ·{" "}
-        <Link to="/admin/questions">Manage Q&amp;A →</Link>
+        <Link to="/admin/questions">Manage Q&amp;A →</Link> ·{" "}
+        <Link to="/admin/registry">Manage registry →</Link>
       </p>
       {error !== null && <p className="notice error">{error}</p>}
       {summary === null && error === null && <p className="lede">Loading…</p>}

@@ -1,5 +1,12 @@
 import { describe, expect, it } from "vitest";
 import { planBackdrops } from "./backdrops.ts";
+import { slugify } from "./photo-files.ts";
+
+describe("slugify", () => {
+  it("drops accents and punctuation", () => {
+    expect(slugify("Crème Brûlée Torch!")).toBe("creme-brulee-torch");
+  });
+});
 
 describe("planBackdrops", () => {
   it("lists only photos, in natural name order, with web-safe names", () => {

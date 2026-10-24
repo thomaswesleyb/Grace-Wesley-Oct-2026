@@ -15,13 +15,17 @@ async function add(body: Record<string, unknown> = pets) {
   return addedQuestion.parse(await response.json());
 }
 
-async function publicList() {
+async function publicResponse() {
   const response = await call("/api/questions");
   expect(response.status).toBe(200);
-  return questionsResponse.parse(await response.json()).questions;
+  return questionsResponse.parse(await response.json());
 }
 
+const publicList = async () => (await publicResponse()).questions;
+const publicEdits = async () => (await publicResponse()).edits;
+
 const path = (id: string) => `/api/admin/questions/${id}`;
+const builtPath = (key: string) => `/api/admin/questions/built/${key}`;
 
 describe("admin question routes", () => {
   it("fail closed without Cloudflare Access", async () => {
@@ -30,7 +34,10 @@ describe("admin question routes", () => {
     const patched = await call(path("x"), { ...noAccess, method: "PATCH", body: pets });
     expect(patched.status).toBe(503);
     expect((await call(path("x"), { ...noAccess, method: "DELETE" })).status).toBe(503);
-    expect(await publicList()).toEqual([]);
+    const built = { ...noAccess, method: "PATCH", body: { ...pets, hidden: false } };
+    expect((await call(builtPath("parking"), built)).status).toBe(503);
+    expect((await call(builtPath("parking"), { ...noAccess, method: "DELETE" })).status).toBe(503);
+    expect(await publicResponse()).toEqual({ questions: [], edits: [] });
   });
 });
 
@@ -77,5 +84,46 @@ describe("added questions", () => {
     const patched = await call(path(id), { ...asAdmin, method: "PATCH", body });
     expect(patched.status).toBe(400);
     expect(await publicList()).toMatchObject([pets]);
+  });
+});
+
+const editBuilt = (key: string, body: unknown) =>
+  call(builtPath(key), { ...asAdmin, method: "PATCH", body });
+
+describe("edits to DETAILS.md questions", () => {
+  const parking = { topic: "Lodging", question: "Parking?", answer: "On the lawn.", hidden: false };
+
+  it("show publicly once saved, and a second save replaces the first", async () => {
+    expect((await editBuilt("parking", parking)).status).toBe(200);
+    expect((await editBuilt("parking", { ...parking, hidden: true })).status).toBe(200);
+    expect(await publicEdits()).toMatchObject([{ key: "parking", ...parking, hidden: true }]);
+  });
+
+  it("can be reset, and a second reset reports there's nothing to reset", async () => {
+    await editBuilt("parking", parking);
+    expect((await call(builtPath("parking"), { ...asAdmin, method: "DELETE" })).status).toBe(200);
+    expect(await publicEdits()).toEqual([]);
+    expect((await call(builtPath("parking"), { ...asAdmin, method: "DELETE" })).status).toBe(404);
+  });
+
+  it("refuse a key that isn't in content/qa.ts", async () => {
+    expect((await editBuilt("not-a-question", parking)).status).toBe(404);
+    expect(await publicEdits()).toEqual([]);
+  });
+
+  it.each([
+    ["a missing hidden flag", { topic: "Lodging", question: "Parking?", answer: "Lawn." }],
+    ["a blank answer", { ...parking, answer: "  " }],
+    ["an unknown topic", { ...parking, topic: "Food" }],
+    ["a body that isn't JSON", "not json"],
+  ])("refuse %s", async (_, body) => {
+    expect((await editBuilt("parking", body)).status).toBe(400);
+    expect(await publicEdits()).toEqual([]);
+  });
+
+  it("don't touch the added questions", async () => {
+    const added = await add();
+    await editBuilt("parking", parking);
+    expect(await publicList()).toEqual([added]);
   });
 });

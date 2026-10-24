@@ -140,17 +140,15 @@ function scheduleAndContact(facts: Facts, localParts: number[]) {
   return { startsAt, contact, warnings };
 }
 
-/** Q&A entries whose facts are all present; the rest are listed as hidden. */
+/** Every Q&A entry; those missing a fact get a null answer and are listed as hidden. */
 function buildQa(facts: Facts) {
   const fact = (label: FactLabel) => facts.get(label);
   const qa: SiteContent["qa"] = [];
   const hiddenQuestions: string[] = [];
-  for (const entry of QA_ENTRIES) {
-    if (entry.requires.every((label) => facts.has(label))) {
-      qa.push({ topic: entry.topic, question: entry.question, answer: entry.answer(fact) });
-    } else {
-      hiddenQuestions.push(entry.question);
-    }
+  for (const { key, topic, question, requires, answer } of QA_ENTRIES) {
+    const complete = requires.every((label) => facts.has(label));
+    qa.push({ key, topic, question, answer: complete ? answer(fact) : null });
+    if (!complete) hiddenQuestions.push(question);
   }
   return { qa, hiddenQuestions };
 }

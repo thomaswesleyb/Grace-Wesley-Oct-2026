@@ -10,6 +10,7 @@ export async function resetDb(): Promise<void> {
     env.DB.prepare("DELETE FROM sessions"),
     env.DB.prepare("DELETE FROM labyrinth_runs"),
     env.DB.prepare("DELETE FROM questions"),
+    env.DB.prepare("DELETE FROM question_edits"),
     env.DB.prepare("DELETE FROM contributions"),
     env.DB.prepare("DELETE FROM registry_items"),
     env.DB.prepare("DELETE FROM rsvp_people"),
@@ -98,7 +99,7 @@ export async function call(
 
 export async function seedItem(
   id: string,
-  priceCents: number,
+  priceCents: number | null,
   paidCents: number[] = [],
 ): Promise<void> {
   await env.DB.batch([

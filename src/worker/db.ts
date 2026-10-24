@@ -4,6 +4,7 @@ import type {
   AdminContribution,
   AdminGuest,
   AdminRsvp,
+  BuiltEdit,
   ParsedRsvpSubmission,
   QuestionFields,
   RegistryItem,
@@ -188,13 +189,13 @@ interface RegistryRow {
   id: string;
   name: string;
   description: string | null;
-  image: string | null;
+  image_id: string | null;
   link: string | null;
-  price_cents: number;
+  price_cents: number | null;
   raised_cents: number;
 }
 
-const REGISTRY_SELECT = `SELECT r.id, r.name, r.description, r.image, r.link, r.price_cents,
+const REGISTRY_SELECT = `SELECT r.id, r.name, r.description, r.image_id, r.link, r.price_cents,
     COALESCE((SELECT SUM(c.amount_cents) FROM contributions c
               WHERE c.item_id = r.id AND c.status = 'paid'), 0) AS raised_cents
   FROM registry_items r`;
@@ -203,7 +204,7 @@ const toRegistryItem = (r: RegistryRow): RegistryItem => ({
   id: r.id,
   name: r.name,
   description: r.description,
-  image: r.image,
+  image: r.image_id === null ? null : `/media/registry/${r.image_id}`,
   link: r.link,
   priceCents: r.price_cents,
   raisedCents: r.raised_cents,
@@ -220,6 +221,95 @@ export async function listRegistryItems(db: D1Database): Promise<RegistryItem[]>
 export async function getRegistryItem(db: D1Database, id: string): Promise<RegistryItem | null> {
   const row = await db.prepare(`${REGISTRY_SELECT} WHERE r.id = ?`).bind(id).first<RegistryRow>();
   return row === null ? null : toRegistryItem(row);
+}
+
+/** The text of a new or edited item, with its link already cleaned. */
+export interface RegistryText {
+  name: string;
+  description: string;
+  priceCents: number | null;
+  link: string | null;
+}
+
+/** Adds an item after the others. */
+export async function insertRegistryItem(
+  db: D1Database,
+  id: string,
+  item: RegistryText,
+): Promise<void> {
+  await db
+    .prepare(
+      `INSERT INTO registry_items (id, name, description, price_cents, link, sort)
+       SELECT ?, ?, ?, ?, ?, (SELECT COALESCE(MAX(sort), -1) + 1 FROM registry_items)`,
+    )
+    .bind(id, item.name, item.description, item.priceCents, item.link)
+    .run();
+}
+
+export async function updateRegistryItem(
+  db: D1Database,
+  id: string,
+  item: RegistryText,
+): Promise<boolean> {
+  const result = await db
+    .prepare(
+      "UPDATE registry_items SET name = ?, description = ?, price_cents = ?, link = ? WHERE id = ?",
+    )
+    .bind(item.name, item.description, item.priceCents, item.link, id)
+    .run();
+  return result.meta.changes === 1;
+}
+
+/**
+ * Points an item at a new picture (or none). Returns the picture it replaced, so its file can be
+ * deleted, or undefined when the item doesn't exist.
+ */
+export async function setRegistryImage(
+  db: D1Database,
+  id: string,
+  imageId: string | null,
+): Promise<string | null | undefined> {
+  const [before, update] = await db.batch<{ image_id: string | null }>([
+    db.prepare("SELECT image_id FROM registry_items WHERE id = ?").bind(id),
+    db.prepare("UPDATE registry_items SET image_id = ? WHERE id = ?").bind(imageId, id),
+  ]);
+  if (update?.meta.changes !== 1) return undefined;
+  return before?.results[0]?.image_id ?? null;
+}
+
+export type RegistryDelete =
+  | { deleted: true; imageId: string | null }
+  | { deleted: false; reason: "missing" | "has-gifts" };
+
+/** Deletes an item no one has given toward. An item with gifts keeps their record. */
+export async function deleteRegistryItem(db: D1Database, id: string): Promise<RegistryDelete> {
+  const row = await db
+    .prepare(
+      `SELECT image_id, EXISTS (SELECT 1 FROM contributions WHERE item_id = ?1) AS has_gifts
+       FROM registry_items WHERE id = ?1`,
+    )
+    .bind(id)
+    .first<{ image_id: string | null; has_gifts: number }>();
+  if (row === null) return { deleted: false, reason: "missing" };
+  if (row.has_gifts === 1) return { deleted: false, reason: "has-gifts" };
+  const result = await db
+    .prepare(
+      `DELETE FROM registry_items WHERE id = ?1
+         AND NOT EXISTS (SELECT 1 FROM contributions WHERE item_id = ?1)`,
+    )
+    .bind(id)
+    .run();
+  if (result.meta.changes !== 1) return { deleted: false, reason: "has-gifts" };
+  return { deleted: true, imageId: row.image_id };
+}
+
+/** True when an item shows this picture; other files in the bucket aren't served as one. */
+export async function registryImageInUse(db: D1Database, imageId: string): Promise<boolean> {
+  const row = await db
+    .prepare("SELECT 1 AS found FROM registry_items WHERE image_id = ?")
+    .bind(imageId)
+    .first<{ found: number }>();
+  return row !== null;
 }
 
 export async function listPaidContributions(db: D1Database): Promise<AdminContribution[]> {
@@ -419,6 +509,41 @@ export async function updateQuestion(
 
 export async function deleteQuestion(db: D1Database, id: string): Promise<boolean> {
   const result = await db.prepare("DELETE FROM questions WHERE id = ?").bind(id).run();
+  return result.meta.changes === 1;
+}
+
+export async function listBuiltEdits(db: D1Database): Promise<BuiltEdit[]> {
+  const { results } = await db
+    .prepare(
+      `SELECT key, topic, question, answer, hidden, updated_at AS updatedAt FROM question_edits
+       ORDER BY key`,
+    )
+    .all<Omit<BuiltEdit, "hidden"> & { hidden: number }>();
+  return results.map(({ key, topic, question, answer, hidden, updatedAt }) => ({
+    key,
+    topic,
+    question,
+    answer,
+    hidden: hidden === 1,
+    updatedAt,
+  }));
+}
+
+export async function upsertBuiltEdit(db: D1Database, edit: BuiltEdit): Promise<void> {
+  await db
+    .prepare(
+      `INSERT INTO question_edits (key, topic, question, answer, hidden, updated_at)
+       VALUES (?, ?, ?, ?, ?, ?)
+       ON CONFLICT (key) DO UPDATE SET topic = excluded.topic, question = excluded.question,
+         answer = excluded.answer, hidden = excluded.hidden, updated_at = excluded.updated_at`,
+    )
+    .bind(edit.key, edit.topic, edit.question, edit.answer, edit.hidden ? 1 : 0, edit.updatedAt)
+    .run();
+}
+
+/** Returns false when that question had no edit. */
+export async function deleteBuiltEdit(db: D1Database, key: string): Promise<boolean> {
+  const result = await db.prepare("DELETE FROM question_edits WHERE key = ?").bind(key).run();
   return result.meta.changes === 1;
 }
 

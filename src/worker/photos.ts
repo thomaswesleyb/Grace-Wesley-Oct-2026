@@ -169,9 +169,9 @@ async function storePhoto(
   return "stored";
 }
 
-async function servePhoto(c: AppContext, id: string, copy: string, cacheControl: string) {
-  if (!isCopy(copy)) return c.json({ error: "Not found." }, 404);
-  const object = await c.env.PHOTOS.get(objectKey(id, copy));
+/** Streams one file from the PHOTOS bucket with its stored content type. */
+export async function serveObject(c: AppContext, key: string, cacheControl: string) {
+  const object = await c.env.PHOTOS.get(key);
   if (object === null) return c.json({ error: "Not found." }, 404);
   const headers = new Headers({
     "Cache-Control": cacheControl,
@@ -180,6 +180,11 @@ async function servePhoto(c: AppContext, id: string, copy: string, cacheControl:
   });
   object.writeHttpMetadata(headers);
   return new Response(object.body, { headers });
+}
+
+function servePhoto(c: AppContext, id: string, copy: string, cacheControl: string) {
+  if (!isCopy(copy)) return Promise.resolve(c.json({ error: "Not found." }, 404));
+  return serveObject(c, objectKey(id, copy), cacheControl);
 }
 
 /** Public photo files, at /media/photos/<id>/(large|small). Only approved photos are served. */

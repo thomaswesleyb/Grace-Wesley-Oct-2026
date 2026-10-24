@@ -53,8 +53,10 @@ accessibility); registry and other. Each entry appears only when its answer is i
   description, and a "View item" link to the retailer (tracking parameters removed).
 - Guests choose an amount: $10 minimum, maximum = the item's remaining balance. A fully funded
   item shows "Fully gifted" and its button is disabled.
-- Items load from `wedding-registry.csv` (optional `Image` and `Description` columns). The page
-  is in the navigation now; remove the nav link before launch to hide it.
+- The couple adds items on `/admin/registry` (decided 2026-10-24, replacing the CSV seed): name,
+  short description are required; cost, link and picture are optional. No cost = an open fund
+  (honeymoon fund) that shows "$X given so far" with no bar. The Registry link is in
+  the navigation; before Stripe is connected the page says "Gifts open soon".
 - Payments run through Stripe Checkout. Contributor names, notes, and emails are visible only to
   the couple. The public sees bars and dollar amounts.
 

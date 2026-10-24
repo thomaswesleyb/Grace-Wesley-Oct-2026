@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest";
 import {
   cleanRetailerLink,
   contributionProblem,
+  dollarsToCents,
   formatDollars,
   percentFunded,
   remainingCents,
@@ -18,6 +19,13 @@ describe("progress", () => {
 });
 
 describe("contributionProblem", () => {
+  it("lets an open fund take any amount from $10 up to the most one gift can be", () => {
+    expect(contributionProblem(1000, null, 0)).toBeNull();
+    expect(contributionProblem(500_000, null, 9_000_000)).toBeNull();
+    expect(contributionProblem(999, null, 0)).toMatch(/smallest gift is \$10/);
+    expect(contributionProblem(10_000_001, null, 0)).toMatch(/most one gift can be is \$100,000/);
+  });
+
   it("accepts amounts from $10 up to what's left", () => {
     expect(contributionProblem(1000, 70000, 0)).toBeNull();
     expect(contributionProblem(70000, 70000, 0)).toBeNull();
@@ -76,5 +84,17 @@ describe("cleanRetailerLink", () => {
 
   it("throws on something that isn't a URL", () => {
     expect(() => cleanRetailerLink("not a url")).toThrow();
+  });
+});
+
+describe("dollarsToCents", () => {
+  it("reads typical amounts", () => {
+    expect(dollarsToCents("50")).toBe(5000);
+    expect(dollarsToCents(" $1,000.25 ")).toBe(100025);
+    expect(dollarsToCents("19.9")).toBe(1990);
+  });
+
+  it("rejects anything that isn't dollars and cents", () => {
+    for (const bad of ["", "abc", "-5", "1.234", "1e3"]) expect(dollarsToCents(bad)).toBeNaN();
   });
 });

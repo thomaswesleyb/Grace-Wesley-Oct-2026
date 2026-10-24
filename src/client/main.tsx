@@ -5,6 +5,7 @@ import { Layout } from "@client/components/Layout.tsx";
 import { Admin } from "@client/pages/Admin.tsx";
 import { AdminPhotos } from "@client/pages/AdminPhotos.tsx";
 import { AdminQuestions } from "@client/pages/AdminQuestions.tsx";
+import { AdminRegistry } from "@client/pages/AdminRegistry.tsx";
 import { Home } from "@client/pages/Home.tsx";
 import { Labyrinth } from "@client/pages/Labyrinth.tsx";
 import { NotFound } from "@client/pages/NotFound.tsx";
@@ -30,6 +31,7 @@ const router = createBrowserRouter([
       { path: "/admin", element: <Admin /> },
       { path: "/admin/photos", element: <AdminPhotos /> },
       { path: "/admin/questions", element: <AdminQuestions /> },
+      { path: "/admin/registry", element: <AdminRegistry /> },
       { path: "*", element: <NotFound /> },
     ],
   },

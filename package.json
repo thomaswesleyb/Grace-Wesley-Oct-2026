@@ -14,7 +14,6 @@
     "db:migrate:local": "wrangler d1 migrations apply wedding --local",
     "db:migrate:remote": "wrangler d1 migrations apply wedding --remote",
     "seed:guests": "tsx scripts/seed-guests.ts",
-    "seed:registry": "tsx scripts/seed-registry.ts",
     "photos:import": "tsx scripts/import-gallery.ts",
     "test": "pnpm gen && vitest run",
     "lint": "oxlint --deny-warnings",

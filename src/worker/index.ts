@@ -4,7 +4,7 @@ import { admin } from "@worker/admin.ts";
 import type { Env } from "@worker/env.ts";
 import { adminPhotos, media, photos } from "@worker/photos.ts";
 import { adminQuestions, questions } from "@worker/questions.ts";
-import { registry, stripeWebhook } from "@worker/registry.ts";
+import { adminRegistry, registry, registryMedia, stripeWebhook } from "@worker/registry.ts";
 import { labyrinth } from "@worker/labyrinth.ts";
 import { rsvp } from "@worker/rsvp.ts";
 import { session } from "@worker/session.ts";
@@ -23,6 +23,7 @@ api.route("/session", session);
 api.route("/labyrinth", labyrinth);
 api.route("/admin/photos", adminPhotos);
 api.route("/admin/questions", adminQuestions);
+api.route("/admin/registry", adminRegistry);
 api.route("/admin", admin);
 api.route("/photos", photos);
 api.route("/questions", questions);
@@ -31,6 +32,7 @@ api.route("/stripe", stripeWebhook);
 
 const app = new Hono<{ Bindings: Env }>();
 app.route("/api", api);
+app.route("/media/registry", registryMedia);
 app.route("/media", media);
 
 app.notFound((c) => c.json({ error: "Not found." }, 404));
