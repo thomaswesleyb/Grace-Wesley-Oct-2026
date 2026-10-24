@@ -80,6 +80,19 @@ describe("POST /api/registry/checkout", () => {
     );
   });
 
+  it("lets an open fund keep taking gifts with no goal", async () => {
+    await seedItem("honeymoon", null, [2_000_000]);
+    vi.spyOn(globalThis, "fetch").mockResolvedValue(
+      Response.json({ id: "cs_test_2", url: "https://checkout.stripe.com/c/pay/cs_test_2" }),
+    );
+    const ok = await checkout({ itemId: "honeymoon", amountCents: 250_000, name: "Ann" });
+    expect(ok.status).toBe(200);
+    const tooBig = await checkout({ itemId: "honeymoon", amountCents: 10_000_001, name: "Ann" });
+    expect(tooBig.status).toBe(400);
+    const tooSmall = await checkout({ itemId: "honeymoon", amountCents: 999, name: "Ann" });
+    expect(tooSmall.status).toBe(400);
+  });
+
   it("rejects unknown items and incomplete requests", async () => {
     expect((await checkout({ itemId: "nope", amountCents: 5000, name: "Ann" })).status).toBe(404);
     expect((await checkout({ itemId: "nope", amountCents: 5000, name: "" })).status).toBe(400);
@@ -186,5 +199,238 @@ describe("verifyStripeSignature", () => {
     ).toBe(true);
     expect(await verifyStripeSignature("{}", "t=1000", "whsec", 1000)).toBe(false);
     expect(await verifyStripeSignature("{}", "garbage", "whsec", 1000)).toBe(false);
+  });
+});
+
+const asAdmin = { origin: "http://localhost:5173", env: { ADMIN_DEV_BYPASS: "1" } };
+const noAccess = { env: { ACCESS_TEAM_DOMAIN: "", ACCESS_AUD: "" } };
+
+const ITEM = {
+  name: "Espresso Machine",
+  description: "For slow Saturday mornings.",
+  priceCents: 70000,
+  link: "https://www.example.com/espresso?variant=2&utm_source=google&gclid=abc",
+};
+
+const asciiBytes = (text: string) => [...text].map((ch) => ch.charCodeAt(0));
+const webpFile = (tag = 0) =>
+  new File(
+    [new Uint8Array([...asciiBytes("RIFF"), 0, 0, 0, 0, ...asciiBytes("WEBP"), tag])],
+    "p.webp",
+    {
+      type: "image/webp",
+    },
+  );
+
+function pictureForm(file: File): FormData {
+  const form = new FormData();
+  form.set("image", file);
+  return form;
+}
+
+async function addItem(overrides: Record<string, unknown> = {}): Promise<string> {
+  const response = await call("/api/admin/registry", {
+    ...asAdmin,
+    body: { ...ITEM, ...overrides },
+  });
+  expect(response.status).toBe(200);
+  return (await response.json<{ id: string }>()).id;
+}
+
+async function publicItems() {
+  return (await (await call("/api/registry")).json<{ items: Record<string, unknown>[] }>()).items;
+}
+
+const patchPrice = (id: string, priceCents: number | null) =>
+  call(`/api/admin/registry/${id}`, { ...asAdmin, method: "PATCH", body: { ...ITEM, priceCents } });
+
+const upload = (id: string, file: File) =>
+  call(`/api/admin/registry/${id}/image`, { ...asAdmin, body: pictureForm(file) });
+
+const errorOf = async (response: Response) => (await response.json<{ error: string }>()).error;
+
+describe("admin registry routes", () => {
+  it("fail closed without Cloudflare Access", async () => {
+    await seedItem("espresso", 70000);
+    expect((await call("/api/admin/registry", noAccess)).status).toBe(503);
+    expect((await call("/api/admin/registry", { ...noAccess, body: ITEM })).status).toBe(503);
+    const patched = await call("/api/admin/registry/espresso", {
+      ...noAccess,
+      method: "PATCH",
+      body: ITEM,
+    });
+    expect(patched.status).toBe(503);
+    const deleted = await call("/api/admin/registry/espresso", { ...noAccess, method: "DELETE" });
+    expect(deleted.status).toBe(503);
+    const pictured = await call("/api/admin/registry/espresso/image", {
+      ...noAccess,
+      body: pictureForm(webpFile()),
+    });
+    expect(pictured.status).toBe(503);
+    expect(await publicItems()).toHaveLength(1);
+  });
+});
+
+describe("adding registry items", () => {
+  it("shows a new item on the Registry page, in the order added, without tracking links", async () => {
+    const first = await addItem();
+    const second = await addItem({ name: "Luggage", priceCents: 113000 });
+    expect(await publicItems()).toEqual([
+      {
+        id: first,
+        name: "Espresso Machine",
+        description: "For slow Saturday mornings.",
+        image: null,
+        link: "https://www.example.com/espresso?variant=2",
+        priceCents: 70000,
+        raisedCents: 0,
+      },
+      expect.objectContaining({ id: second, name: "Luggage" }),
+    ]);
+  });
+
+  it("adds an open fund with no link when the cost and link are left out", async () => {
+    const id = await addItem({ name: "Honeymoon fund", priceCents: null, link: null });
+    expect(await publicItems()).toEqual([
+      expect.objectContaining({ id, priceCents: null, link: null, raisedCents: 0 }),
+    ]);
+  });
+
+  it("refuses missing fields, a zero price and links that aren't web links", async () => {
+    const bad = [
+      { name: "" },
+      { description: " " },
+      { priceCents: 0 },
+      { priceCents: 12.5 },
+      { link: "" },
+      { link: "javascript:alert(1)" },
+      { link: "ftp://example.com/x" },
+      { link: "https://localhost/x" },
+    ];
+    const responses = await Promise.all(
+      bad.map((overrides) =>
+        call("/api/admin/registry", { ...asAdmin, body: { ...ITEM, ...overrides } }),
+      ),
+    );
+    expect(responses.map((r) => r.status)).toEqual(bad.map(() => 400));
+    expect(await publicItems()).toEqual([]);
+  });
+});
+
+describe("editing registry items", () => {
+  it("saves new text", async () => {
+    const id = await addItem();
+    const response = await call(`/api/admin/registry/${id}`, {
+      ...asAdmin,
+      method: "PATCH",
+      body: { ...ITEM, name: "Grinder", priceCents: 25000 },
+    });
+    expect(response.status).toBe(200);
+    expect(await publicItems()).toEqual([
+      expect.objectContaining({ name: "Grinder", priceCents: 25000 }),
+    ]);
+  });
+
+  it("won't lower the price below what guests have given", async () => {
+    await seedItem("espresso", 70000, [30000]);
+    const lowered = await patchPrice("espresso", 29999);
+    expect(lowered.status).toBe(400);
+    expect(await errorOf(lowered)).toMatch(/\$300/);
+    expect((await patchPrice("espresso", 30000)).status).toBe(200);
+  });
+
+  it("turns an item with gifts into an open fund, and back into a goal", async () => {
+    await seedItem("espresso", 70000, [30000]);
+    expect((await patchPrice("espresso", null)).status).toBe(200);
+    expect((await publicItems())[0]).toMatchObject({ priceCents: null, raisedCents: 30000 });
+    expect((await patchPrice("espresso", 40000)).status).toBe(200);
+    expect((await publicItems())[0]).toMatchObject({ priceCents: 40000 });
+  });
+
+  it("removes a link", async () => {
+    const id = await addItem();
+    const response = await call(`/api/admin/registry/${id}`, {
+      ...asAdmin,
+      method: "PATCH",
+      body: { ...ITEM, link: null },
+    });
+    expect(response.status).toBe(200);
+    expect((await publicItems())[0]).toMatchObject({ link: null });
+  });
+
+  it("says when the item is gone", async () => {
+    const response = await call("/api/admin/registry/nope", {
+      ...asAdmin,
+      method: "PATCH",
+      body: ITEM,
+    });
+    expect(response.status).toBe(404);
+  });
+});
+
+describe("deleting registry items", () => {
+  it("removes an item no one has given toward, and its picture", async () => {
+    const id = await addItem();
+    await call(`/api/admin/registry/${id}/image`, { ...asAdmin, body: pictureForm(webpFile()) });
+    const response = await call(`/api/admin/registry/${id}`, { ...asAdmin, method: "DELETE" });
+    expect(response.status).toBe(200);
+    expect(await publicItems()).toEqual([]);
+    expect((await env.PHOTOS.list({ prefix: "registry/" })).objects).toEqual([]);
+  });
+
+  it("keeps an item guests have given toward", async () => {
+    await seedItem("espresso", 70000, [5000]);
+    const response = await call("/api/admin/registry/espresso", { ...asAdmin, method: "DELETE" });
+    expect(response.status).toBe(409);
+    expect(await publicItems()).toHaveLength(1);
+  });
+
+  it("says when the item is already gone", async () => {
+    const response = await call("/api/admin/registry/nope", { ...asAdmin, method: "DELETE" });
+    expect(response.status).toBe(404);
+  });
+});
+
+describe("registry pictures", () => {
+  it("serves the picture publicly and replaces the old file on a new upload", async () => {
+    const id = await addItem();
+    expect((await upload(id, webpFile(1))).status).toBe(200);
+    const [firstSrc] = (await publicItems()).map((item) => String(item["image"]));
+    const served = await call(firstSrc!);
+    expect(served.status).toBe(200);
+    expect(served.headers.get("content-type")).toBe("image/webp");
+
+    expect((await upload(id, webpFile(2))).status).toBe(200);
+    const [secondSrc] = (await publicItems()).map((item) => String(item["image"]));
+    expect(secondSrc).not.toBe(firstSrc);
+    expect((await call(firstSrc!)).status).toBe(404);
+    expect((await env.PHOTOS.list({ prefix: "registry/" })).objects).toHaveLength(1);
+  });
+
+  it("removes a picture", async () => {
+    const id = await addItem();
+    await upload(id, webpFile());
+    const [src] = (await publicItems()).map((item) => String(item["image"]));
+    const response = await call(`/api/admin/registry/${id}/image`, {
+      ...asAdmin,
+      method: "DELETE",
+    });
+    expect(response.status).toBe(200);
+    expect((await publicItems())[0]?.["image"]).toBeNull();
+    expect((await call(src!)).status).toBe(404);
+    expect((await env.PHOTOS.list({ prefix: "registry/" })).objects).toEqual([]);
+  });
+
+  it("refuses files that aren't WebP or JPEG, and items that don't exist", async () => {
+    const id = await addItem();
+    const text = new File(["<svg onload=alert(1)>"], "x.svg", { type: "image/svg+xml" });
+    expect((await upload(id, text)).status).toBe(400);
+    expect((await upload("nope", webpFile())).status).toBe(404);
+    expect((await env.PHOTOS.list({ prefix: "registry/" })).objects).toEqual([]);
+  });
+
+  it("doesn't serve bucket files that no item shows", async () => {
+    await env.PHOTOS.put("registry/stray", new Uint8Array([1, 2, 3]));
+    expect((await call("/media/registry/stray")).status).toBe(404);
   });
 });

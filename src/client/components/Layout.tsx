@@ -3,7 +3,7 @@ import { RandomBackdrop } from "@client/components/Backdrop.tsx";
 import { site } from "@client/site.ts";
 
 /** Home has its own fixed backdrop; admin is a plain working page. */
-const OWN_BACKDROP = new Set(["/", "/admin", "/admin/photos"]);
+const OWN_BACKDROP = new Set(["/", "/admin", "/admin/photos", "/admin/registry"]);
 
 export function Layout() {
   const { pathname } = useLocation();
@@ -35,6 +35,9 @@ export function Layout() {
             </li>
             <li>
               <NavLink to="/labyrinth">Labyrinth</NavLink>
+            </li>
+            <li>
+              <NavLink to="/registry">Registry</NavLink>
             </li>
           </ul>
         </nav>

@@ -1,10 +1,17 @@
-import { slugify } from "./registry.ts";
-
 export const PHOTO_EXTENSIONS = [".jpg", ".jpeg", ".png", ".webp", ".heic"] as const;
 
 export function isPhoto(file: string): boolean {
   const lower = file.toLowerCase();
   return PHOTO_EXTENSIONS.some((ext) => lower.endsWith(ext));
+}
+
+export function slugify(name: string): string {
+  return name
+    .normalize("NFD")
+    .replace(/\p{M}/gu, "")
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-|-$/g, "");
 }
 
 function stem(file: string): string {

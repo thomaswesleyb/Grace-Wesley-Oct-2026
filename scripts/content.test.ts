@@ -28,15 +28,23 @@ describe("parseDetails", () => {
 });
 
 describe("buildContent", () => {
-  it("shows only Q&A entries whose facts exist", () => {
+  it("answers Q&A entries whose facts exist and leaves the rest unanswered", () => {
     const { content, hiddenQuestions } = buildContent(
       parseDetails(`${BASE}\nParking: Behind the chapel.`),
     );
-    expect(content.qa.map((q) => q.question)).toContain("Where should I park?");
-    expect(content.qa.find((q) => q.question === "Where should I park?")?.answer).toBe(
-      "Behind the chapel.",
-    );
+    const byKey = (key: string) => content.qa.find((q) => q.key === key);
+    expect(byKey("parking")).toMatchObject({
+      question: "Where should I park?",
+      answer: "Behind the chapel.",
+    });
+    expect(byKey("dress-code")).toMatchObject({ question: "What should I wear?", answer: null });
     expect(hiddenQuestions).toContain("What should I wear?");
+    expect(content.qa.filter((q) => q.answer === null)).toHaveLength(hiddenQuestions.length);
+  });
+
+  it("gives every Q&A entry a unique key, since admin edits are saved under it", () => {
+    const keys = buildContent(parseDetails(BASE)).content.qa.map((q) => q.key);
+    expect(new Set(keys).size).toBe(keys.length);
   });
 
   it("answers when, how to RSVP and whom to contact from DETAILS.md", () => {

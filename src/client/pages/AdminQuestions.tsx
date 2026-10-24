@@ -3,12 +3,16 @@ import { Link } from "react-router";
 import { TOPICS, type Topic } from "@content/qa.ts";
 import { apiFetch, ApiRequestError } from "@client/api.ts";
 import { site } from "@client/site.ts";
+import { shownBuilt, type BuiltQuestion } from "@shared/questions.ts";
 import {
   addedQuestion,
   okResponse,
   questionsResponse,
   type AddedQuestion,
+  type BuiltEdit,
+  type BuiltEditFields,
   type QuestionFields,
+  type QuestionsResponse,
 } from "@shared/schemas.ts";
 import "@client/pages/admin.css";
 import "@client/pages/qa.css";
@@ -17,6 +21,7 @@ const errorMessage = (e: unknown, fallback: string) =>
   e instanceof ApiRequestError ? e.message : fallback;
 
 const questionPath = (q: AddedQuestion) => `/api/admin/questions/${encodeURIComponent(q.id)}`;
+const builtPath = (key: string) => `/api/admin/questions/built/${encodeURIComponent(key)}`;
 
 const BLANK: QuestionFields = { topic: TOPICS[0], question: "", answer: "" };
 
@@ -96,6 +101,172 @@ interface RowActions {
   busy: boolean;
   onSave: (question: AddedQuestion, fields: QuestionFields) => Promise<boolean>;
   onDelete: (question: AddedQuestion) => void;
+  onSaveBuilt: (key: string, fields: BuiltEditFields) => Promise<boolean>;
+  onResetBuilt: (key: string) => Promise<boolean>;
+}
+
+/** A DETAILS.md question with the couple's edit, if any; `edit` decides its topic. */
+interface BuiltItem {
+  entry: BuiltQuestion;
+  edit: BuiltEdit | undefined;
+}
+
+const sameText = (a: QuestionFields, b: QuestionFields) =>
+  a.topic === b.topic && a.question === b.question && a.answer === b.answer;
+
+function builtStatus({ entry, edit }: BuiltItem): string {
+  if (edit === undefined) {
+    return entry.answer === null
+      ? "Not on the Q&A page: DETAILS.md doesn't have this answer yet. Answer it here to show it."
+      : "From DETAILS.md.";
+  }
+  return edit.hidden ? "Hidden from the Q&A page." : "Edited here. Reset to use DETAILS.md again.";
+}
+
+function BuiltButtons(props: {
+  busy: boolean;
+  answered: boolean;
+  hidden: boolean;
+  edited: boolean;
+  onEdit: () => void;
+  onToggleHidden: () => void;
+  onReset: () => void;
+}) {
+  return (
+    <>
+      <button
+        className="button secondary admin-delete"
+        type="button"
+        disabled={props.busy}
+        onClick={props.onEdit}
+      >
+        {props.answered ? "Edit" : "Answer"}
+      </button>
+      {props.answered && (
+        <button
+          className="button secondary admin-delete"
+          type="button"
+          disabled={props.busy}
+          onClick={props.onToggleHidden}
+        >
+          {props.hidden ? "Show" : "Hide"}
+        </button>
+      )}
+      {props.edited && (
+        <button
+          className="button secondary admin-delete"
+          type="button"
+          disabled={props.busy}
+          onClick={props.onReset}
+        >
+          Reset
+        </button>
+      )}
+    </>
+  );
+}
+
+function ConfirmReset(props: { busy: boolean; onConfirm: () => void; onCancel: () => void }) {
+  return (
+    <span className="admin-confirm" role="group" aria-label="Confirm reset">
+      <span>Discard your edits and use DETAILS.md?</span>
+      <button
+        className="button admin-delete"
+        type="button"
+        disabled={props.busy}
+        onClick={props.onConfirm}
+      >
+        Yes, reset
+      </button>
+      <button
+        className="button secondary admin-delete"
+        type="button"
+        disabled={props.busy}
+        onClick={props.onCancel}
+      >
+        Cancel
+      </button>
+    </span>
+  );
+}
+
+/** The text the couple sees and edits: theirs if edited, else DETAILS.md's (blank if missing). */
+function builtFields({ entry, edit }: BuiltItem): QuestionFields {
+  const { topic, question, answer } = edit ?? { ...entry, answer: entry.answer ?? "" };
+  return { topic, question, answer };
+}
+
+/** True when the question's text, hidden or not, still matches DETAILS.md. */
+const matchesDetails = (item: BuiltItem) =>
+  item.entry.answer !== null &&
+  sameText(builtFields(item), { ...item.entry, answer: item.entry.answer });
+
+function BuiltText({ item }: { item: BuiltItem }) {
+  const { question, answer } = builtFields(item);
+  const original = item.edit === undefined ? null : item.entry.answer;
+  return (
+    <>
+      <p className="admin-question-q">{question}</p>
+      {answer !== "" && <p className="admin-question-a">{answer}</p>}
+      <p className="admin-muted">{builtStatus(item)}</p>
+      {original !== null && <p className="admin-muted">DETAILS.md says: {original}</p>}
+    </>
+  );
+}
+
+function BuiltRow({ item, ...actions }: { item: BuiltItem } & RowActions) {
+  const { entry, edit } = item;
+  const { busy, onSaveBuilt, onResetBuilt } = actions;
+  const [mode, setMode] = useState<"view" | "edit" | "confirm">("view");
+  const fields = builtFields(item);
+  const hidden = edit?.hidden ?? false;
+  /** Showing a hidden question whose text matches DETAILS.md drops the edit altogether. */
+  const toggleHidden = () =>
+    void (hidden && matchesDetails(item)
+      ? onResetBuilt(entry.key)
+      : onSaveBuilt(entry.key, { ...fields, hidden: !hidden }));
+  if (mode === "edit") {
+    return (
+      <li className="admin-question built">
+        <QuestionForm
+          id={`built-${entry.key}`}
+          initial={fields}
+          submitLabel="Save"
+          busy={busy}
+          onSubmit={async (changed) => {
+            const saved = await onSaveBuilt(entry.key, { ...changed, hidden });
+            if (saved) setMode("view");
+            return saved;
+          }}
+          onCancel={() => setMode("view")}
+        />
+      </li>
+    );
+  }
+  return (
+    <li className={`admin-question built${shownBuilt(entry, edit) === null ? " off" : ""}`}>
+      <BuiltText item={item} />
+      <div className="admin-photo-actions">
+        {mode === "view" ? (
+          <BuiltButtons
+            busy={busy}
+            answered={fields.answer !== ""}
+            hidden={hidden}
+            edited={edit !== undefined}
+            onEdit={() => setMode("edit")}
+            onToggleHidden={toggleHidden}
+            onReset={() => setMode("confirm")}
+          />
+        ) : (
+          <ConfirmReset
+            busy={busy}
+            onConfirm={() => void onResetBuilt(entry.key).then(() => setMode("view"))}
+            onCancel={() => setMode("view")}
+          />
+        )}
+      </div>
+    </li>
+  );
 }
 
 function AddedRow({ question, busy, onSave, onDelete }: { question: AddedQuestion } & RowActions) {
@@ -168,10 +339,11 @@ function AddedRow({ question, busy, onSave, onDelete }: { question: AddedQuestio
   );
 }
 
-/** One topic: the DETAILS.md questions (read-only), then the added ones. */
-function TopicSection(props: { topic: Topic; added: AddedQuestion[] } & RowActions) {
-  const { topic, added, ...actions } = props;
-  const built = site.qa.filter((entry) => entry.topic === topic);
+/** One topic: the DETAILS.md questions, then the added ones, in Q&A page order. */
+function TopicSection(
+  props: { topic: Topic; built: BuiltItem[]; added: AddedQuestion[] } & RowActions,
+) {
+  const { topic, built, added, ...actions } = props;
   return (
     <section className="admin-guests">
       <h2>{topic}</h2>
@@ -179,12 +351,8 @@ function TopicSection(props: { topic: Topic; added: AddedQuestion[] } & RowActio
         <p className="admin-muted">No questions in this topic yet.</p>
       )}
       <ul className="admin-question-list">
-        {built.map((entry) => (
-          <li key={entry.question} className="admin-question built">
-            <p className="admin-question-q">{entry.question}</p>
-            <p className="admin-question-a">{entry.answer}</p>
-            <p className="admin-muted">From DETAILS.md. Change it there and redeploy.</p>
-          </li>
+        {built.map((item) => (
+          <BuiltRow key={item.entry.key} item={item} {...actions} />
         ))}
         {added.map((question) => (
           <AddedRow key={question.id} question={question} {...actions} />
@@ -195,14 +363,14 @@ function TopicSection(props: { topic: Topic; added: AddedQuestion[] } & RowActio
 }
 
 export function AdminQuestions() {
-  const [added, setAdded] = useState<AddedQuestion[] | null>(null);
+  const [data, setData] = useState<QuestionsResponse | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
 
   const load = useCallback(
     () =>
       apiFetch("/api/admin/questions", questionsResponse)
-        .then(({ questions }) => setAdded(questions))
+        .then(setData)
         .catch((e: unknown) => setError(errorMessage(e, "Couldn't load the questions."))),
     [],
   );
@@ -241,6 +409,22 @@ export function AdminQuestions() {
       () => apiFetch(questionPath(question), okResponse, { method: "DELETE" }),
       "Couldn't delete that question.",
     );
+  const saveBuilt = (key: string, body: BuiltEditFields) =>
+    run(
+      () => apiFetch(builtPath(key), okResponse, { method: "PATCH", body }),
+      "Couldn't save that change.",
+    );
+  const resetBuilt = (key: string) =>
+    run(
+      () => apiFetch(builtPath(key), okResponse, { method: "DELETE" }),
+      "Couldn't reset that question.",
+    );
+
+  const editByKey = new Map(data?.edits.map((edit) => [edit.key, edit]));
+  const builtItems: BuiltItem[] = site.qa.map((entry) => ({
+    entry,
+    edit: editByKey.get(entry.key),
+  }));
 
   return (
     <section className="page admin">
@@ -249,8 +433,8 @@ export function AdminQuestions() {
         <Link to="/admin">← RSVPs</Link> · <Link to="/qa">See the Q&amp;A page</Link>
       </p>
       {error !== null && <p className="notice error">{error}</p>}
-      {added === null && error === null && <p className="lede">Loading…</p>}
-      {added !== null && (
+      {data === null && error === null && <p className="lede">Loading…</p>}
+      {data !== null && (
         <>
           <section className="admin-guests" aria-labelledby="add-heading">
             <h2 id="add-heading">Add a question</h2>
@@ -267,10 +451,13 @@ export function AdminQuestions() {
             <TopicSection
               key={topic}
               topic={topic}
-              added={added.filter((q) => q.topic === topic)}
+              built={builtItems.filter((item) => (item.edit ?? item.entry).topic === topic)}
+              added={data.questions.filter((q) => q.topic === topic)}
               busy={busy}
               onSave={save}
               onDelete={remove}
+              onSaveBuilt={saveBuilt}
+              onResetBuilt={resetBuilt}
             />
           ))}
         </>

@@ -4,6 +4,7 @@ import { apiFetch, ApiRequestError } from "@client/api.ts";
 import { site } from "@client/site.ts";
 import {
   contributionProblem,
+  dollarsToCents,
   formatDollars,
   MIN_CONTRIBUTION_CENTS,
   percentFunded,
@@ -17,14 +18,17 @@ import {
 } from "@shared/schemas.ts";
 import "@client/pages/registry.css";
 
-/** "50", "50.5", "$1,000.25" → cents; NaN when it isn't a dollar amount. */
-export function dollarsToCents(input: string): number {
-  const cleaned = input.trim().replace(/[$,\s]/g, "");
-  if (!/^\d+(\.\d{1,2})?$/.test(cleaned)) return Number.NaN;
-  return Math.round(Number(cleaned) * 100);
-}
-
+/** A goal's bar, or for an open fund (no price) just what's been given so far. */
 function ProgressBar({ item }: { item: RegistryItem }) {
+  if (item.priceCents === null) {
+    return (
+      <div className="gift-progress">
+        <p className="gift-amounts">
+          <span>{formatDollars(item.raisedCents)} given so far</span>
+        </p>
+      </div>
+    );
+  }
   const percent = percentFunded(item.priceCents, item.raisedCents);
   return (
     <div className="gift-progress">
@@ -84,7 +88,9 @@ function ContributeForm({ item, onCancel }: { item: RegistryItem; onCancel: () =
     <form className="gift-form" onSubmit={submit}>
       <div className="field">
         <label htmlFor={`amount-${item.id}`}>
-          Amount ({formatDollars(minimum)} to {formatDollars(remaining)})
+          {item.priceCents === null
+            ? `Amount (at least ${formatDollars(minimum)})`
+            : `Amount (${formatDollars(minimum)} to ${formatDollars(remaining)})`}
         </label>
         <input
           id={`amount-${item.id}`}

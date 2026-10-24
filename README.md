@@ -17,7 +17,6 @@ Requires Node 22 (`nvm use 22`) and pnpm 12.
 | `pnpm check` | Lint, format check, type check, tests |
 | `pnpm db:migrate:local` / `db:migrate:remote` | Apply `migrations/` to the local or production database |
 | `pnpm seed:guests --local\|--remote [file.csv]` | Load or update the guest list (default `guest-list.csv`) |
-| `pnpm seed:registry --local\|--remote [file.csv]` | Load or update registry items (default `wedding-registry.csv`) |
 | `pnpm photos:import --local\|--remote` | One time: copy the photos that used to be built into the site (`content/gallery.json`) into R2 and D1. Refuses if the photos table isn't empty |
 | `pnpm deploy` | Build and deploy to Cloudflare |
 
@@ -51,10 +50,14 @@ Guests find their own name on the guest list, then answer for up to their number
 
 ## Registry
 
-`wedding-registry.csv` columns: `Item,Price,Link`, plus optional `Image` (a path under `public/`,
-e.g. `registry/espresso.webp`) and `Description`. Re-run `pnpm seed:registry` after editing; items
-are matched by name, so gifts already given stay attached. Ad-tracking parameters are stripped
-from links.
+Add, edit and delete items on `/admin/registry`: a name, a short description, and an optional
+cost, link to the item and picture. An item with no cost is an open fund (e.g. a
+honeymoon fund): it shows what's been given so far instead of a progress bar, never fills up,
+and takes gifts from $10 up to $100,000 each. Items show on the Registry page at once. The browser resizes
+the picture (800 px on its longest side) before uploading it to the `PHOTOS` R2 bucket under
+`registry/`. Ad-tracking parameters are stripped from links, and only `http(s)` links are
+accepted. An item can't be deleted once anyone has given toward it, and its price can't drop
+below what's been given.
 
 Guests give through Stripe Checkout. A gift counts toward its bar only after Stripe's webhook
 confirms payment. Contributions are $10 minimum (or whatever is left, if less) and capped at the
@@ -88,10 +91,15 @@ The Photos page loads its photos from the API, so new photos show up without a d
 ## Q&A
 
 Questions come from two places. The ones in `content/qa.ts` get their answers from
-`DETAILS.md` and change only with a deploy. Questions added on `/admin/questions` are stored in
-the D1 `questions` table and appear on the Q&A page right away, after the `DETAILS.md` ones in
-the same topic. You can edit or delete the added ones on that page. The `DETAILS.md` ones are
-shown there read-only.
+`DETAILS.md`. Questions added on `/admin/questions` are stored in the D1 `questions` table and
+appear on the Q&A page right away, after the `DETAILS.md` ones in the same topic.
+
+Every question is editable on `/admin/questions`. You can edit or delete the added ones. For the
+`DETAILS.md` ones you can change the topic, question or answer, hide them, or reset them to the
+`DETAILS.md` version. That page also lists the ones `DETAILS.md` can't answer yet, and answering
+one there puts it on the Q&A page. These edits are stored in the D1 `question_edits` table
+under each entry's `key` in `content/qa.ts`, and they override `DETAILS.md` until you reset
+them. Keep a `key` the same when rewording its question, or its edit is dropped.
 
 ## First deploy (one time)
 
@@ -114,8 +122,7 @@ shown there read-only.
    `https://parkhillbaileywedding.com/api/stripe/webhook` with the events
    `checkout.session.completed` and `checkout.session.async_payment_succeeded`. Then run
    `pnpm exec wrangler secret put STRIPE_SECRET_KEY` and
-   `pnpm exec wrangler secret put STRIPE_WEBHOOK_SECRET` (the endpoint's signing secret), and
-   `pnpm seed:registry --remote`. To try it locally with test cards, put test-mode keys in
+   `pnpm exec wrangler secret put STRIPE_WEBHOOK_SECRET` (the endpoint's signing secret). To try it locally with test cards, put test-mode keys in
    `.dev.vars` and forward events with `stripe listen --forward-to localhost:5173/api/stripe/webhook`.
 
 ## Local admin

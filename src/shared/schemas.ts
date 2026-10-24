@@ -1,6 +1,7 @@
 import { z } from "zod";
 import { TOPICS } from "@content/qa.ts";
 import { LARGE_EDGE } from "@shared/photos.ts";
+import { MAX_PRICE_CENTS } from "@shared/registry.ts";
 
 const personName = z.string().trim().min(1).max(60);
 const optionalText = (max: number) =>
@@ -138,12 +139,32 @@ export const registryItem = z.object({
   id: z.string(),
   name: z.string(),
   description: z.string().nullable(),
+  /** Where the picture is served, or null when the item has none. */
   image: z.string().nullable(),
   link: z.string().nullable(),
-  priceCents: z.number().int(),
+  /** Null for an open fund, which has no goal and shows only what's been given. */
+  priceCents: z.number().int().nullable(),
   raisedCents: z.number().int(),
 });
 export type RegistryItem = z.infer<typeof registryItem>;
+
+/** An item as the couple enters it on /admin/registry. The picture is uploaded separately. */
+export const registryItemFields = z.object({
+  name: z.string().trim().min(1).max(120),
+  description: z.string().trim().min(1).max(500),
+  /** Null for an open fund, like a honeymoon fund. */
+  priceCents: z.number().int().min(1).max(MAX_PRICE_CENTS).nullable(),
+  /** Null for no link. Only web links, so a link can't run script when a guest clicks it. */
+  link: z
+    .string()
+    .trim()
+    .max(2000)
+    .pipe(z.url({ protocol: /^https?$/, hostname: z.regexes.domain }))
+    .nullable(),
+});
+export type RegistryItemFields = z.input<typeof registryItemFields>;
+
+export const createdRegistryItem = z.object({ id: z.string() });
 
 export const registryResponse = z.object({
   items: z.array(registryItem),
@@ -262,8 +283,18 @@ export type QuestionFields = z.input<typeof questionFields>;
 export const addedQuestion = questionFields.extend({ id: z.string(), createdAt: z.string() });
 export type AddedQuestion = z.infer<typeof addedQuestion>;
 
-/** Oldest first. */
-export const questionsResponse = z.object({ questions: z.array(addedQuestion) });
+/** The couple's change to a DETAILS.md question (content/qa.ts `key`), made from /admin/questions. */
+export const builtEditFields = questionFields.extend({ hidden: z.boolean() });
+export type BuiltEditFields = z.input<typeof builtEditFields>;
+
+export const builtEdit = builtEditFields.extend({ key: z.string(), updatedAt: z.string() });
+export type BuiltEdit = z.infer<typeof builtEdit>;
+
+/** Added questions oldest first, plus the edits to DETAILS.md questions. */
+export const questionsResponse = z.object({
+  questions: z.array(addedQuestion),
+  edits: z.array(builtEdit),
+});
 export type QuestionsResponse = z.infer<typeof questionsResponse>;
 
 /** Who the visitor is, once they've sent an RSVP from this browser; null until then. */

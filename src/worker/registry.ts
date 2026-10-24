@@ -1,20 +1,39 @@
-import { Hono } from "hono";
-import { contributionProblem, formatDollars } from "@shared/registry.ts";
-import { checkoutRequest, type RegistryResponse } from "@shared/schemas.ts";
-import { getRegistryItem, listRegistryItems } from "@worker/db.ts";
+import { Hono, type Context } from "hono";
+import { sniffPhotoType } from "@shared/photos.ts";
+import {
+  cleanRetailerLink,
+  contributionProblem,
+  formatDollars,
+  MAX_REGISTRY_IMAGE_BYTES,
+} from "@shared/registry.ts";
+import { checkoutRequest, registryItemFields, type RegistryResponse } from "@shared/schemas.ts";
+import { requireAccess } from "@worker/admin.ts";
+import {
+  deleteRegistryItem,
+  getRegistryItem,
+  insertRegistryItem,
+  listRegistryItems,
+  registryImageInUse,
+  setRegistryImage,
+  updateRegistryItem,
+  type RegistryText,
+} from "@worker/db.ts";
 import type { Env } from "@worker/env.ts";
 import { sendAlert } from "@worker/notify.ts";
+import { serveObject } from "@worker/photos.ts";
 import { createCheckoutSession, verifyStripeSignature } from "@worker/stripe.ts";
 
 export const registry = new Hono<{ Bindings: Env }>();
 
-registry.get("/", async (c) => {
-  const items = await listRegistryItems(c.env.DB);
-  return c.json({
-    items,
+type AppContext = Context<{ Bindings: Env }>;
+
+const registryList = async (c: AppContext) =>
+  c.json({
+    items: await listRegistryItems(c.env.DB),
     acceptingGifts: Boolean(c.env.STRIPE_SECRET_KEY),
   } satisfies RegistryResponse);
-});
+
+registry.get("/", registryList);
 
 registry.post("/checkout", async (c) => {
   const secretKey = c.env.STRIPE_SECRET_KEY;
@@ -139,4 +158,112 @@ stripeWebhook.post("/webhook", async (c) => {
   const gift = giftFrom(session);
   if (await recordGift(c.env.DB, gift)) c.executionCtx.waitUntil(alertForGift(c.env, gift));
   return c.json({ received: true });
+});
+
+const imageKey = (imageId: string) => `registry/${imageId}`;
+
+/** Item pictures, at /media/registry/<image id>. A new picture gets a new id, so it caches. */
+export const registryMedia = new Hono<{ Bindings: Env }>();
+
+registryMedia.get("/:imageId", async (c) => {
+  const imageId = c.req.param("imageId");
+  if (!(await registryImageInUse(c.env.DB, imageId))) return c.json({ error: "Not found." }, 404);
+  return serveObject(c, imageKey(imageId), "public, max-age=604800, immutable");
+});
+
+/** Adding and editing registry items at /api/admin/registry, behind Cloudflare Access. */
+export const adminRegistry = new Hono<{ Bindings: Env }>();
+adminRegistry.use("*", requireAccess);
+
+const ITEM_NOT_FOUND = "That item doesn't exist. It may have been deleted.";
+
+/** The item text in the request, with its link cleaned of tracking parameters, or an error. */
+async function readItemText(c: AppContext): Promise<RegistryText | string> {
+  const parsed = registryItemFields.safeParse(await c.req.json().catch(() => null));
+  if (!parsed.success) {
+    return "Please give the item a name and a short description. A cost must be in dollars, and a link must be a web link (https://…).";
+  }
+  const { link } = parsed.data;
+  return { ...parsed.data, link: link === null ? null : cleanRetailerLink(link) };
+}
+
+adminRegistry.get("/", registryList);
+
+adminRegistry.post("/", async (c) => {
+  const item = await readItemText(c);
+  if (typeof item === "string") return c.json({ error: item }, 400);
+  const id = crypto.randomUUID();
+  await insertRegistryItem(c.env.DB, id, item);
+  console.log(`Admin added registry item ${id}.`);
+  return c.json({ id });
+});
+
+adminRegistry.patch("/:id", async (c) => {
+  const item = await readItemText(c);
+  if (typeof item === "string") return c.json({ error: item }, 400);
+  const current = await getRegistryItem(c.env.DB, c.req.param("id"));
+  if (current === null) return c.json({ error: ITEM_NOT_FOUND }, 404);
+  if (item.priceCents !== null && item.priceCents < current.raisedCents) {
+    const raised = formatDollars(current.raisedCents);
+    return c.json(
+      { error: `Guests have already given ${raised}, so the price can't be lower.` },
+      400,
+    );
+  }
+  if (!(await updateRegistryItem(c.env.DB, current.id, item))) {
+    return c.json({ error: ITEM_NOT_FOUND }, 404);
+  }
+  return c.json({ ok: true as const });
+});
+
+adminRegistry.delete("/:id", async (c) => {
+  const id = c.req.param("id");
+  const result = await deleteRegistryItem(c.env.DB, id);
+  if (!result.deleted && result.reason === "missing") return c.json({ error: ITEM_NOT_FOUND }, 404);
+  if (!result.deleted) {
+    return c.json(
+      { error: "Guests have given toward this item, so it can't be deleted. Their gifts stay." },
+      409,
+    );
+  }
+  if (result.imageId !== null) await c.env.PHOTOS.delete(imageKey(result.imageId));
+  console.log(`Admin deleted registry item ${id}.`);
+  return c.json({ ok: true as const });
+});
+
+/** Reads the `image` file of a multipart upload: a WebP or JPEG the browser already resized. */
+async function readImage(c: AppContext): Promise<{ bytes: ArrayBuffer; type: string } | string> {
+  const body = await c.req.parseBody().catch(() => null);
+  const file = body?.["image"];
+  if (!(file instanceof File)) return "Please send the picture as a form upload named image.";
+  if (file.size > MAX_REGISTRY_IMAGE_BYTES) {
+    return `The picture is over ${MAX_REGISTRY_IMAGE_BYTES / 1024 / 1024} MB. Please try a smaller one.`;
+  }
+  const bytes = await file.arrayBuffer();
+  const type = sniffPhotoType(new Uint8Array(bytes, 0, Math.min(12, bytes.byteLength)));
+  return type === null ? "The picture isn't a WebP or JPEG image." : { bytes, type };
+}
+
+/** Stores a new picture first, then points the item at it and deletes the one it replaced. */
+adminRegistry.post("/:id/image", async (c) => {
+  const image = await readImage(c);
+  if (typeof image === "string") return c.json({ error: image }, 400);
+  const imageId = crypto.randomUUID();
+  await c.env.PHOTOS.put(imageKey(imageId), image.bytes, {
+    httpMetadata: { contentType: image.type },
+  });
+  const replaced = await setRegistryImage(c.env.DB, c.req.param("id"), imageId);
+  if (replaced === undefined) {
+    await c.env.PHOTOS.delete(imageKey(imageId));
+    return c.json({ error: ITEM_NOT_FOUND }, 404);
+  }
+  if (replaced !== null) await c.env.PHOTOS.delete(imageKey(replaced));
+  return c.json({ ok: true as const });
+});
+
+adminRegistry.delete("/:id/image", async (c) => {
+  const replaced = await setRegistryImage(c.env.DB, c.req.param("id"), null);
+  if (replaced === undefined) return c.json({ error: ITEM_NOT_FOUND }, 404);
+  if (replaced !== null) await c.env.PHOTOS.delete(imageKey(replaced));
+  return c.json({ ok: true as const });
 });

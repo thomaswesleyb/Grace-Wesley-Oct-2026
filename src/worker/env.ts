@@ -1,6 +1,9 @@
 export interface Env {
   DB: D1Database;
-  /** Both copies of every photo, under `<photo id>/large` and `<photo id>/small`. */
+  /**
+   * Both copies of every photo, under `<photo id>/large` and `<photo id>/small`, and registry
+   * item pictures under `registry/<image id>`.
+   */
   PHOTOS: R2Bucket;
   /** Per-IP limit on RSVP name lookups and submissions. */
   RSVP_LIMITER: RateLimit;

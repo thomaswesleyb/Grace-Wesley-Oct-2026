@@ -7,9 +7,12 @@ const facts = parseDetails(readFileSync(`${root}DETAILS.md`, "utf8"));
 const { content, hiddenQuestions, warnings } = buildContent(facts);
 
 writeFileSync(`${root}content/details.json`, `${JSON.stringify(content, null, 2)}\n`);
-console.log(`content/details.json: ${content.qa.length} Q&A entries shown.`);
+const shown = content.qa.length - hiddenQuestions.length;
+console.log(`content/details.json: ${shown} Q&A entries shown.`);
 for (const warning of warnings) console.warn(`warning: ${warning}`);
 if (hiddenQuestions.length > 0) {
-  console.log(`Hidden until DETAILS.md has the answer (${hiddenQuestions.length}):`);
+  console.log(
+    `Hidden until DETAILS.md or /admin/questions answers them (${hiddenQuestions.length}):`,
+  );
   for (const question of hiddenQuestions) console.log(`  - ${question}`);
 }

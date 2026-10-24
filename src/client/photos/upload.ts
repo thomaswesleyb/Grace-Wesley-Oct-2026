@@ -1,5 +1,5 @@
 import { apiFetch, ApiRequestError } from "@client/api.ts";
-import { copySizes, type Size } from "@shared/photos.ts";
+import { copySizes, fitWithin, type Size } from "@shared/photos.ts";
 import { photoUploadResult } from "@shared/schemas.ts";
 
 /** Browsers that can't encode WebP (Safari) fall back to JPEG. */
@@ -49,6 +49,16 @@ export async function photoForm(file: File, fields: Record<string, string>): Pro
     form.set("height", String(large.height));
     for (const [name, value] of Object.entries(fields)) form.set(name, value);
     return form;
+  } finally {
+    bitmap.close();
+  }
+}
+
+/** One copy of an image, no side longer than `maxEdge`, ready to upload. */
+export async function resizedImage(file: File, maxEdge: number): Promise<Blob> {
+  const bitmap = await decode(file);
+  try {
+    return await encode(bitmap, fitWithin(bitmap, maxEdge, maxEdge));
   } finally {
     bitmap.close();
   }

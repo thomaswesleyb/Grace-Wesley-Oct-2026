@@ -2,24 +2,32 @@ import { useEffect, useState } from "react";
 import { TOPICS } from "@content/qa.ts";
 import { apiFetch } from "@client/api.ts";
 import { site } from "@client/site.ts";
-import { questionsResponse, type AddedQuestion } from "@shared/schemas.ts";
+import { qaItems, type QaItem } from "@shared/questions.ts";
+import { questionsResponse } from "@shared/schemas.ts";
 import "@client/pages/qa.css";
 
+/** Waits for the couple's edits so an edited or hidden answer never flashes its old version. */
 export function QA() {
-  const [added, setAdded] = useState<AddedQuestion[]>([]);
+  const [all, setAll] = useState<QaItem[] | null>(null);
 
   useEffect(() => {
     apiFetch("/api/questions", questionsResponse)
-      .then(({ questions }) => setAdded(questions))
-      .catch((e: unknown) =>
-        console.warn("Couldn't load added questions; showing DETAILS.md ones only.", e),
-      );
+      .then(({ questions, edits }) => setAll(qaItems(site.qa, questions, edits)))
+      .catch((e: unknown) => {
+        console.warn("Couldn't load the admin's questions; showing DETAILS.md ones only.", e);
+        setAll(qaItems(site.qa, [], []));
+      });
   }, []);
 
-  const all = [
-    ...site.qa.map(({ topic, question, answer }) => ({ key: question, topic, question, answer })),
-    ...added.map(({ id, topic, question, answer }) => ({ key: id, topic, question, answer })),
-  ];
+  if (all === null) {
+    return (
+      <section className="page">
+        <h1>Important Information</h1>
+        <p className="lede">Loading…</p>
+      </section>
+    );
+  }
+
   const topics = TOPICS.map((topic) => ({
     topic,
     entries: all.filter((entry) => entry.topic === topic),

@@ -30,6 +30,9 @@ shared code. Guests find their own name, and each can answer for up to their
 **Built Oct 22, not deployed:** guest sessions (an RSVP signs the guest in for Labyrinth times,
 the leaderboard and photo credit). Needs `! pnpm db:migrate:remote` (migration 0008), then `! pnpm deploy`.
 
+**Built Oct 23, not deployed:** every Q&A question is editable on `/admin/questions`, including
+the `DETAILS.md` ones. Needs `! pnpm db:migrate:remote` (migration 0009), then `! pnpm deploy`.
+
 **Left before invitations go out:**
 
 1. Commit and push the guest-list RSVP work.
@@ -286,19 +289,18 @@ where an email was missed and the database is damaged.
 
 ### 15. Registry content
 
-**What it is:** `wedding-registry.csv` lists each gift: name, price and store link, with
-optional photo and description. *Reseeding* loads your edits into the database. It's safe to
-repeat, and gifts already given stay attached.
+**What it is:** `/admin/registry` is where you add each gift: name, short description, cost, a
+link to the item, and an optional picture. Items show on the Registry page as soon as you save
+them. It needs migration `0010` in production first: `! pnpm db:migrate:remote`, then
+`! pnpm deploy`.
 
 **Why:** photos and a line of description make the cards inviting and show guests what they're
 contributing toward. The intro line also turns on the "Do you have a registry?" Q&A answer.
 
-- [ ] Add `Image` and `Description` columns to `wedding-registry.csv`. Put the photos in
-      `public/registry/`. Add any more items.
+- [ ] Add your items on `/admin/registry`.
 - [ ] Add `Registry intro: …` to `DETAILS.md` if you haven't already.
 
-> Prompt: **"I updated the registry CSV and photos. Reseed the local registry and show me the
-> page."**
+> Prompt: *none; the admin page saves straight to the site.*
 
 ### 16. Stripe account
 
@@ -347,8 +349,7 @@ real $10 test proves the live setup end to end before guests use it.
 - [ ] Run `! pnpm exec wrangler secret put STRIPE_SECRET_KEY` (live `sk_live_…` key) and
       `! pnpm exec wrangler secret put STRIPE_WEBHOOK_SECRET` (the endpoint's signing secret).
 
-> Prompt: **"Live Stripe secrets are set. Seed the registry to production, show the Registry
-> link again, and deploy."**
+> Prompt: **"Live Stripe secrets are set. Deploy and check that gifts are open."**
 
 - [ ] Give yourselves a real $10 gift, check that it lands, then refund it in Stripe.
 
